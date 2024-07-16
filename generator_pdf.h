@@ -29,7 +29,29 @@
 #include <interfaces/printinterface.h>
 #include <interfaces/saveinterface.h>
 
+#include <QAbstractScrollArea>
+
 #include <unordered_map>
+
+#include <QEvent>
+#include <QPainter>
+#include <QAbstractTextDocumentLayout>
+#include <KAboutData>
+#include <KConfigDialog>
+#include <KLocalizedString>
+#include <core/page.h>
+#include <core/utils.h>
+#include <vector>
+#include <fstream>
+#include <cstring>
+
+#include <core/textdocumentgenerator.h>
+#include <core/textdocumentgenerator_p.h>
+#include <QApplication>
+#include <QtWidgets>
+#include <QPushButton>
+
+#include "../Okular-v3d-Plugin-Code/src/Rendering/renderheadless.h"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
@@ -53,6 +75,63 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
     Q_INTERFACES(Okular::ConfigInterface)
     Q_INTERFACES(Okular::PrintInterface)
     Q_INTERFACES(Okular::SaveInterface)
+
+// ==================================== Custom Addition ====================================
+public:
+    class EventFilter : public QObject {
+    public:
+        EventFilter(QObject* parent, PDFGenerator* generator)
+            : QObject(parent), generator(generator) { }
+        ~EventFilter() override = default;
+
+        bool eventFilter(QObject *object, QEvent *event) {
+            if (generator == nullptr) {
+                return false;
+            }
+
+            if (event->type() == QEvent::MouseMove) {
+                QMouseEvent* mouseMove = dynamic_cast<QMouseEvent*>(event);
+
+                if (mouseMove != nullptr) {
+                    return generator->mouseMoveEvent(mouseMove);
+                }
+
+            } else if (event->type() == QEvent::MouseButtonPress) {
+                QMouseEvent* mousePress = dynamic_cast<QMouseEvent*>(event);
+
+                if (mousePress != nullptr) {
+                    return generator->mouseButtonPressEvent(mousePress);
+                }
+
+            } else if (event->type() == QEvent::MouseButtonRelease) {
+                QMouseEvent* mouseRelease = dynamic_cast<QMouseEvent*>(event);
+
+                if (mouseRelease != nullptr) {
+                    return generator->mouseButtonReleaseEvent(mouseRelease);
+                }
+            }
+
+            return false;
+        }
+
+        PDFGenerator* generator;
+    };
+
+    bool mouseMoveEvent(QMouseEvent* event);
+    bool mouseButtonPressEvent(QMouseEvent* event);
+    bool mouseButtonReleaseEvent(QMouseEvent* event);
+
+private:
+    HeadlessRenderer* m_HeadlessRenderer;
+
+    void CustomConstructor();
+    void CustomDestructor();
+
+    QAbstractScrollArea* m_PageView{ nullptr };
+
+    EventFilter* m_EventFilter{ nullptr };
+
+// ================================= End of Custom Addition =================================
 
 public:
     PDFGenerator(QObject *parent, const QVariantList &args);

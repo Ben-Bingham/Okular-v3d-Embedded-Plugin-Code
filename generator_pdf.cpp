@@ -10,9 +10,14 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include <iostream>
+
 #include <memory>
+// #include "Annot.h"
 
 #include "generator_pdf.h"
+
+// #include "annotations.h"
 
 // qt/kde includes
 #include <QCheckBox>
@@ -65,6 +70,8 @@
 #include <functional>
 
 #include <iostream>
+
+// #include "Page.h"
 
 Q_DECLARE_METATYPE(Poppler::Annotation *)
 Q_DECLARE_METATYPE(Poppler::FontInfo)
@@ -628,6 +635,112 @@ static void PDFGeneratorPopplerDebugFunction(const QString &message, const QVari
     qCDebug(OkularPdfDebug) << "[Poppler]" << message;
 }
 
+// ==================================== Custom Addition ====================================
+
+QAbstractScrollArea* getPageViewWidget() {
+    QAbstractScrollArea* pageView = nullptr;
+
+    for (QWidget* widget : QApplication::allWidgets()) {
+        bool hasScrollArea = false;
+        bool parentIsWidget = false;
+        bool has8Children = false;
+        bool has1QVboxChild = false;
+        bool has5QFrameChild = false;
+
+        QAbstractScrollArea* scrollArea = dynamic_cast<QAbstractScrollArea*>(widget);
+
+        if (scrollArea != nullptr) {
+            hasScrollArea = true;
+        } else {
+            continue;
+        }
+
+        QWidget* parent = dynamic_cast<QWidget*>(widget->parent());
+
+        if (parent != nullptr) {
+            parentIsWidget = true;
+        } else {
+            continue;
+        }
+
+        if (parent->children().size() == 9) {
+            has8Children = true;
+        } else {
+            continue;
+        }
+
+        int QBoxLayoutCount = 0;
+        for (auto child : parent->children()) {
+            QBoxLayout* qBox = dynamic_cast<QBoxLayout*>(child);
+
+            if (qBox != nullptr) {
+                QBoxLayoutCount += 1;
+            }
+        }
+
+        if (QBoxLayoutCount == 1) {
+            has1QVboxChild = true;
+        } else {
+            continue;
+        }
+
+        int QFrameCount = 0;
+        for (auto child : parent->children()) {
+            QFrame* qFrame = dynamic_cast<QFrame*>(child);
+
+            if (qFrame != nullptr) {
+                QFrameCount += 1;
+            }
+        }
+
+        if (QFrameCount == 6) {
+            has5QFrameChild = true;
+        } else {
+            continue;
+        }
+
+        if (hasScrollArea && parentIsWidget && has8Children && has1QVboxChild && has5QFrameChild) {
+            if (pageView != nullptr) {
+                std::cout << "ERROR, multiple pageViews found" << std::endl;
+            }
+
+            pageView = dynamic_cast<QAbstractScrollArea*>(widget);
+        }
+    }
+
+    return pageView;
+}
+
+bool PDFGenerator::mouseMoveEvent(QMouseEvent* event) {
+    // std::cout << "Mouse move event" << std::endl;
+    return false;
+}
+
+bool PDFGenerator::mouseButtonPressEvent(QMouseEvent* event) {
+    // std::cout << "Mouse button press" << std::endl;
+    return false;
+}
+
+bool PDFGenerator::mouseButtonReleaseEvent(QMouseEvent* event) {
+    // std::cout << "Mouse button release" << std::endl;
+    return false;
+}
+
+void PDFGenerator::CustomConstructor() {
+    m_PageView = getPageViewWidget();
+
+    m_EventFilter = new EventFilter(m_PageView, this);
+    m_PageView->viewport()->installEventFilter(m_EventFilter);
+
+    m_HeadlessRenderer = new HeadlessRenderer{ "/home/benjaminb/kde/src/okular/generators/Okular-v3d-Plugin-Code/shaders/" };
+}
+
+void PDFGenerator::CustomDestructor() { 
+    delete m_HeadlessRenderer;
+}
+
+// ================================= End of Custom Addition =================================
+
 PDFGenerator::PDFGenerator(QObject *parent, const QVariantList &args)
     : Generator(parent, args)
     , pdfdoc(nullptr)
@@ -638,7 +751,6 @@ PDFGenerator::PDFGenerator(QObject *parent, const QVariantList &args)
     , annotProxy(nullptr)
     , certStore(nullptr)
 {
-    std::cout << "================================================================= Generating PDF =================================================================" << std::endl;
     setFeature(Threaded);
     setFeature(TextExtraction);
     setFeature(FontInfo);
@@ -667,10 +779,16 @@ PDFGenerator::PDFGenerator(QObject *parent, const QVariantList &args)
         Poppler::setActiveCryptoSignBackend(activeBackend.value());
     }
 #endif
+
+    std::cout << "===================== Start of Constructor =====================" << std::endl;
+    CustomConstructor();
+    std::cout << "====================== End of Constructor ======================" << std::endl;
 }
 
 PDFGenerator::~PDFGenerator()
 {
+    CustomDestructor();
+
     delete pdfOptionsPage;
     delete certStore;
 }
@@ -685,14 +803,40 @@ Okular::Document::OpenResult PDFGenerator::loadDocumentWithPassword(const QStrin
     }
 #endif
     // create PDFDoc for the given file
-    std::cout << "loadDocumentWithPassword" << std::endl;
+    // std::cout << "loadDocumentWithPassword" << std::endl;
     pdfdoc = Poppler::Document::load(filePath, nullptr, nullptr);
 
-    std::cout << "Embedd file count: " << pdfdoc->embeddedFiles().size() << std::endl;
+    // std::cout << "Embedd file count: " << pdfdoc->embeddedFiles().size() << std::endl;
+    // std::cout << "Has embeded files: " << pdfdoc->hasEmbeddedFiles() << std::endl;
 
-    std::cout << pdfdoc->title().toStdString() << std::endl;
+    // Poppler::Page* page = pdfdoc->page(0);
+    // QList<Poppler::Annotation*> annotations = page->annotations();
+    // for (auto annot : annotations) {
+    //     // std::cout << "Name: " << annot->author().toStdString() << std::endl;
+    //     // std::cout << "  Subtype: " << annot->subType() << std::endl;
+    //     if (annot->subType() == 14) {
+    //         Poppler::RichMediaAnnotation* a = dynamic_cast<Poppler::RichMediaAnnotation*>(annot);
 
-    
+    //         if (a) {
+    //             // std::cout << "      FOUND RICH ANNOTATION" << std::endl;
+    //             Poppler::RichMediaAnnotation::Content* content = a->content();
+    //             QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
+
+    //             for (auto asset : assets) {
+    //                 // std::cout << "      NAME: " << asset->name().toStdString() << std::endl;
+    //                 Poppler::EmbeddedFile* file = asset->embeddedFile();
+
+    //                 // std::cout << "          Embedded file info:" << std::endl;
+    //                 // std::cout << "              IsValid: " << file->isValid() << std::endl;
+    //                 // std::cout << "              size: " << file->size() << std::endl;
+    //                 // std::cout << "              name: " << file->name().toStdString() << std::endl;
+    //                 // std::cout << "              Data Size: " << file->data().size() << std::endl;
+    //             }
+    //         }
+    //     }
+    // }
+
+    //std::cout << pdfdoc->title().toStdString() << std::endl;
 
     return init(pagesVector, password);
 }
@@ -817,7 +961,7 @@ void PDFGenerator::loadPages(QVector<Okular::Page *> &pagesVector, int rotation,
 {
     // TODO XPDF 3.01 check
     const int count = pagesVector.count();
-    std::cout << "Loading: " << count << " Pages" << std::endl;
+    // std::cout << "Loading: " << count << " Pages" << std::endl;
     double w = 0, h = 0;
     for (int i = 0; i < count; i++) {
         // get xpdf page
@@ -1196,7 +1340,7 @@ static bool shouldAbortRenderCallback(const QVariant &vPayload)
 
 QImage PDFGenerator::image(Okular::PixmapRequest *request)
 {
-    std::cout << "Image" << std::endl;
+    //std::cout << "Image" << std::endl;
     // debug requests to this (xpdf) generator
     // qCDebug(OkularPdfDebug) << "id: " << request->id << " is requesting " << (request->async ? "ASYNC" : "sync") <<  " pixmap for page " << request->page->number() << " [" << request->width << " x " << request->height << "].";
 
@@ -1234,18 +1378,22 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
             const QRect rect = request->normalizedRect().geometry(request->width(), request->height());
             if (request->partialUpdatesWanted()) {
                 RenderImagePayload payload(this, request);
+                // std::cout << "Caling renderToImage 1" << std::endl;
                 img = p->renderToImage(
                     fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0, partialUpdateCallback, shouldDoPartialUpdateCallback, shouldAbortRenderCallback, QVariant::fromValue(&payload));
             } else {
                 RenderImagePayload payload(this, request);
+                // std::cout << "Caling renderToImage 2" << std::endl;
                 img = p->renderToImage(fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0, nullptr, nullptr, shouldAbortRenderCallback, QVariant::fromValue(&payload));
             }
         } else {
             if (request->partialUpdatesWanted()) {
                 RenderImagePayload payload(this, request);
+                // std::cout << "Caling renderToImage 3" << std::endl;
                 img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0, partialUpdateCallback, shouldDoPartialUpdateCallback, shouldAbortRenderCallback, QVariant::fromValue(&payload));
             } else {
                 RenderImagePayload payload(this, request);
+                // std::cout << "Caling renderToImage 4" << std::endl;
                 img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0, nullptr, nullptr, shouldAbortRenderCallback, QVariant::fromValue(&payload));
             }
         }
@@ -1263,6 +1411,145 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
 
         resolveMediaLinkReferences(page);
     }
+
+    // Custom
+    QList<Poppler::Annotation*> annotations = p->annotations();
+
+    std::vector<std::string> colors = {
+        "red",
+        "blue",
+        "green",
+        "yellow",
+        "orange",
+        "purple"
+    };
+
+    int i = 0;
+    for (Poppler::Annotation* annotation : annotations) {
+        QRectF bound = annotation->boundary();
+        bound = bound.normalized();
+
+        if (annotation->subType() == Poppler::Annotation::SubType::ARichMedia) {
+            std::cout << "================================== I IS: " << i << std::endl;
+
+            Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(annotation);
+            if (richMedia != nullptr) {
+                std::cout << "Have RichMedia" << std::endl;
+                Poppler::RichMediaAnnotation::Content* content = richMedia->content();
+
+                if (content != nullptr) {
+                    std::cout << "Have Content" << std::endl;
+                    QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
+
+                    int i = 0;
+                    for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
+                        if (asset != nullptr) {
+                            std::cout << "Have asset #" << i << std::endl;
+                            QString assetName = asset->name();
+
+                            std::cout << "  Asset name is: " << assetName.toStdString() << std::endl;
+
+                            Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
+                            if (embeddedFile != nullptr) {
+                                std::cout << "      IsValid?: " << embeddedFile->isValid() << std::endl;
+                                std::cout << "      EmbeddedFileSize: " << embeddedFile->size() << std::endl;
+                                std::cout << "      MimeType: " << embeddedFile->mimeType().toStdString() << std::endl;
+                                QByteArray fileData = embeddedFile->data();
+                                std::cout << "          EmbeddedFile data size: " << fileData.size() << std::endl;
+                            }
+                        }
+                        ++i;
+                    }
+                }
+            }
+
+            double pageWidth = request->width();
+            double pageHeight = request->height();
+
+            double left   = bound.left();
+            double right  = bound.right();
+            double top    = bound.top();
+            double bottom = bound.bottom();
+
+            int leftPixel   = pageWidth * left;
+            int rightPixel  = pageWidth * right;
+            int topPixel    = pageHeight * top;
+            int bottomPixel = pageHeight * bottom;
+
+            int xMin = (int)leftPixel;
+            int xMax = (int)rightPixel;
+            if (xMin > xMax) {
+                std::swap(xMin, xMax);
+            }
+
+            int yMin = (int)topPixel;
+            int yMax = (int)bottomPixel;
+            if (yMin > yMax) {
+                std::swap(yMin, yMax);
+            }
+
+            // TODO we should be able to get the data of the V3D file from the poppler annotation, and then load that into
+            // TODO the v3dFile class, render the image, and than copy the image data into the img buffer
+
+            int imageWidth = xMax - xMin;
+            int imageHeight = yMax - yMin;
+
+            std::cout << "ImageWidth: " << imageWidth << std::endl;
+            std::cout << "ImageHeight: " << imageHeight << std::endl;
+
+            //VkSubresourceLayout imageSubresourceLayout;
+            //unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mvp);
+
+            for (int x = xMin; x < xMax; ++x) {
+                for (int y = yMin; y < yMax; ++y) {
+                    img.setPixel(x, y, QColor(colors[i].c_str()).rgb());
+                }
+            }
+        }
+
+        ++i;
+    }
+
+    for (auto annotation : annotations) {
+        delete annotation;
+    }
+
+    // QList<Okular::Annotation*> annots = page->annotations();
+    // for (auto annot : annots) {
+    //     Okular::NormalizedRect rect = annot->boundingRectangle();
+    //     std::cout << "Rect width: " << rect.width() << std::endl;
+    //     std::cout << "Rect Height: " << rect.height() << std::endl;
+    //     std::cout << "Style Width: " << annot->style().width() << std::endl;
+    // }
+
+    //std::vector<Annot*> annotList = p->getAnnots();
+
+    //QList<Annotation*> annotations = page->annotations();
+
+    // if (!annotList->getAnnots().empty()) {
+    //     // if (globalParams->getPrintCommands()) {
+    //     //     printf("***** Annotations\n");
+    //     // }
+    //     for (Annot *annot : annots->getAnnots()) {
+    //         std::cout << "Xmin: " << annot->getXMin() << std::endl;
+    //         std::cout << "Ymin: " << annot->getYMin() << std::endl;
+    //         std::cout << "Xmax: " << annot->getXMax() << std::endl;
+    //         std::cout << "Ymax: " << annot->getYMax() << std::endl;
+
+    //         // if ((annotDisplayDecideCbk && (*annotDisplayDecideCbk)(annot, annotDisplayDecideCbkData)) || !annotDisplayDecideCbk) {
+    //         //     annot->draw(gfx, printing);
+    //         // }
+    //     }
+    //     // out->dump();
+    // }
+
+    // for (int i = 100; i < 200; ++i) {
+    //     for (int j = 200; j < 300; ++j) {
+    //         img.setPixel(i, j, QColor("red").rgb());
+    //     }
+    // }
+
+    // End Custom
 
     // 3. UNLOCK [re-enables shared access]
     userMutex()->unlock();
@@ -1810,7 +2097,7 @@ void PDFGenerator::addSynopsisChildren(const QVector<Poppler::OutlineItem> &outl
 
 void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page)
 {
-    std::cout << "Adding Annotations" << std::endl;
+    // std::cout << "Adding Annotations" << std::endl;
     QSet<Poppler::Annotation::SubType> subtypes;
     subtypes << Poppler::Annotation::AFileAttachment << Poppler::Annotation::ASound << Poppler::Annotation::AMovie << Poppler::Annotation::AWidget << Poppler::Annotation::AScreen << Poppler::Annotation::AText << Poppler::Annotation::ALine
              << Poppler::Annotation::AGeom << Poppler::Annotation::AHighlight << Poppler::Annotation::AInk << Poppler::Annotation::AStamp << Poppler::Annotation::ACaret;
@@ -1820,6 +2107,8 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
     for (Poppler::Annotation *a : popplerAnnotations) {
         std::cout << "New Annotation" << std::endl;
         std::cout << "  Type: " << a->subType() << std::endl;
+        std::cout << "  Boundry height: " << a->boundary().height() << std::endl;
+        std::cout << "  Boundry width: " << a->boundary().width() << std::endl;
         bool doDelete = true;
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a, *popplerPage, &doDelete);
         if (newann) {
