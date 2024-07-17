@@ -1431,139 +1431,136 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
         bound = bound.normalized();
 
         if (annotation->subType() == Poppler::Annotation::SubType::ARichMedia) {
-
             Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(annotation);
-            if (richMedia != nullptr) {
-                Poppler::RichMediaAnnotation::Content* content = richMedia->content();
+            if (richMedia == nullptr) {
+                break;
+            }
 
-                if (content != nullptr) {
-                    QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
+            Poppler::RichMediaAnnotation::Content* content = richMedia->content();
+            if (content == nullptr) {
+                break;
+            }
 
-                    int j = 0;
-                    for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
-                        if (asset != nullptr) {
-                            QString assetName = asset->name();
+            QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
 
-                            Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
-                            if (embeddedFile != nullptr) {
-                                QByteArray fileData = embeddedFile->data();
+            int j = 0;
+            for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
+                if (asset == nullptr) {
+                    break;
+                }
+                
+                Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
+                if (embeddedFile == nullptr) {
+                    break;
+                }
 
-                                std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
+                QByteArray fileData = embeddedFile->data();
 
-                                xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
+                std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
 
-                                V3dFile file{ xdrFile };
+                xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
 
-                                std::vector<float> vertices = file.vertices;
-                                std::vector<unsigned int> indices = file.indices;
+                V3dFile file{ xdrFile };
 
-                                double pageWidth = request->width();
-                                double pageHeight = request->height();
+                std::vector<float> vertices = file.vertices;
+                std::vector<unsigned int> indices = file.indices;
 
-                                double left   = bound.left();
-                                double right  = bound.right();
-                                double top    = bound.top();
-                                double bottom = bound.bottom();
+                double pageWidth = request->width();
+                double pageHeight = request->height();
 
-                                int leftPixel   = pageWidth * left;
-                                int rightPixel  = pageWidth * right;
-                                int topPixel    = pageHeight * top;
-                                int bottomPixel = pageHeight * bottom;
+                double left   = bound.left();
+                double right  = bound.right();
+                double top    = bound.top();
+                double bottom = bound.bottom();
 
-                                int xMin = (int)leftPixel;
-                                int xMax = (int)rightPixel;
-                                if (xMin > xMax) {
-                                    std::swap(xMin, xMax);
-                                }
+                int leftPixel   = pageWidth * left;
+                int rightPixel  = pageWidth * right;
+                int topPixel    = pageHeight * top;
+                int bottomPixel = pageHeight * bottom;
 
-                                int yMin = (int)topPixel;
-                                int yMax = (int)bottomPixel;
-                                if (yMin > yMax) {
-                                    std::swap(yMin, yMax);
-                                }
+                int xMin = (int)leftPixel;
+                int xMax = (int)rightPixel;
+                if (xMin > xMax) {
+                    std::swap(xMin, xMax);
+                }
 
-                                int imageWidth = xMax - xMin;
-                                int imageHeight = yMax - yMin;
+                int yMin = (int)topPixel;
+                int yMax = (int)bottomPixel;
+                if (yMin > yMax) {
+                    std::swap(yMin, yMax);
+                }
 
-                                // glm::mat4 model{ 1.0f };
-                                // glm::mat4 view = glm::lookAt(glm::vec3{ 0.0f, 0.0f, -3.0f }, glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
-                                // glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)imageWidth / (float)imageHeight, 0.01f, 100.0f);
-                                // glm::mat4 mvp = projection * view * model;
+                int imageWidth = xMax - xMin;
+                int imageHeight = yMax - yMin;
 
-                                glm::mat4 mat{ 1.0f };
-                                mat[0][0] = 4.940727f;
-                                mat[0][1] = 0.0f;
-                                mat[0][2] = 0.0f;
-                                mat[0][3] = 0.0f;
+                // glm::mat4 model{ 1.0f };
+                // glm::mat4 view = glm::lookAt(glm::vec3{ 0.0f, 0.0f, -3.0f }, glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
+                // glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)imageWidth / (float)imageHeight, 0.01f, 100.0f);
+                // glm::mat4 mvp = projection * view * model;
 
-                                mat[1][0] = 0.0f;
-                                mat[1][1] = 7.913279f;
-                                mat[1][2] = 0.0f;
-                                mat[1][3] = 0.0f;
+                glm::mat4 mat{ 1.0f };
+                mat[0][0] = 4.940727f;
+                mat[0][1] = 0.0f;
+                mat[0][2] = 0.0f;
+                mat[0][3] = 0.0f;
 
-                                mat[2][0] = 0.0f;
-                                mat[2][1] = 0.0f;
-                                mat[2][2] = -2.324568f;
-                                mat[2][3] = -1.0f;
+                mat[1][0] = 0.0f;
+                mat[1][1] = 7.913279f;
+                mat[1][2] = 0.0f;
+                mat[1][3] = 0.0f;
 
-                                mat[3][0] = 0.0f;
-                                mat[3][1] = 0.0f;
-                                mat[3][2] = -2776.484131f;
-                                mat[3][3] = 0.0f;
+                mat[2][0] = 0.0f;
+                mat[2][1] = 0.0f;
+                mat[2][2] = -2.324568f;
+                mat[2][3] = -1.0f;
 
-                                VkSubresourceLayout imageSubresourceLayout;
-                                unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mat);
+                mat[3][0] = 0.0f;
+                mat[3][1] = 0.0f;
+                mat[3][2] = -2776.484131f;
+                mat[3][3] = 0.0f;
 
-                                unsigned char* imgDatatmp = imageData;
+                VkSubresourceLayout imageSubresourceLayout;
+                unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mat);
 
-                                size_t finalImageSize = imageWidth * imageHeight * 4;
+                unsigned char* imgDatatmp = imageData;
 
-                                std::vector<unsigned char> vectorData;
-                                vectorData.reserve(finalImageSize);
+                size_t finalImageSize = imageWidth * imageHeight * 4;
 
-                                int x = 0;
-                                unsigned int* oldRow;
-                                bool done = false;
-                                for (int32_t y = 0; y < imageHeight; y++) {
-                                    unsigned int *row = (unsigned int*)imgDatatmp;
-                                    for (int32_t x = 0; x < imageWidth; x++) {
-                                        unsigned char* charRow = (unsigned char*)row;
-                                        vectorData.push_back(charRow[0]);
-                                        vectorData.push_back(charRow[1]);
-                                        vectorData.push_back(charRow[2]);
-                                        vectorData.push_back(charRow[3]);
+                std::vector<unsigned char> vectorData;
+                vectorData.reserve(finalImageSize);
 
-                                        row++;
-                                    }
-                                    imgDatatmp += imageSubresourceLayout.rowPitch;
-                                }
+                int x = 0;
+                unsigned int* oldRow;
+                bool done = false;
+                for (int32_t y = 0; y < imageHeight; y++) {
+                    unsigned int *row = (unsigned int*)imgDatatmp;
+                    for (int32_t x = 0; x < imageWidth; x++) {
+                        unsigned char* charRow = (unsigned char*)row;
+                        vectorData.push_back(charRow[0]);
+                        vectorData.push_back(charRow[1]);
+                        vectorData.push_back(charRow[2]);
+                        vectorData.push_back(charRow[3]);
 
-                                // std::cout << "X WIdth: " << xMax - xMin << std::endl;
-                                // std::cout << "Y height: " << yMax - yMin << std::endl;
+                        row++;
+                    }
+                    imgDatatmp += imageSubresourceLayout.rowPitch;
+                }
 
-                                // std::cout << "Image width: " << imageWidth << std::endl;
-                                // std::cout << "ImageHeigth: " << imageHeight << std::endl;
-
-                                int k = 0;
-                                for (int y = yMax; y >= yMin; --y) {
-                                    for (int x = xMin; x < xMax; ++x) {
-                                        img.setPixel(x, y, QColor(
-                                            vectorData[k + 0],
-                                            vectorData[k + 1],
-                                            vectorData[k + 2],
-                                            vectorData[k + 3]
-                                        ).rgb());
-                                        k += 4;
-                                    }
-                                }
-                                delete imageData;
-
-                            }
-                        }
-                        ++j;
+                int k = 0;
+                for (int y = yMax; y >= yMin; --y) {
+                    for (int x = xMin; x < xMax; ++x) {
+                        img.setPixel(x, y, QColor(
+                            vectorData[k + 0],
+                            vectorData[k + 1],
+                            vectorData[k + 2],
+                            vectorData[k + 3]
+                        ).rgb());
+                        k += 4;
                     }
                 }
-            }
+                delete imageData;
+                ++j;
+            }    
         }
         ++i;
     }
