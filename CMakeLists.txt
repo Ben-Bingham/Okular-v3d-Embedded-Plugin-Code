@@ -6,10 +6,10 @@ add_subdirectory( conf )
 set(CMAKE_REQUIRED_LIBRARIES Poppler::Qt5 Qt5::Core Qt5::Gui)
 
 include_directories(
-   "${CMAKE_CURRENT_SOURCE_DIR}/../.." "3rdParty/poppler/qt5/src/" "3rdParty/poppler/poppler/" "3rdParty/poppler/"
+   "${CMAKE_CURRENT_SOURCE_DIR}/../.." "3rdParty/poppler/qt5/src/" "3rdParty/poppler/poppler/" "3rdParty/poppler/" "/usr/include/tirpc"
 )
 
-include_directories("../Okular-v3d-Plugin-Code/src/Rendering" "../Okular-v3d-Plugin-Code/src/" "../Okular-v3d-Plugin-Code/src/V3dFile" "../Okular-v3d-Plugin-Code/dependencies/" "../Okular-v3d-Plugin-Code/dependencies/VulkanTools" "/usr/include/tirpc" "/home/benjaminb/kde/build/kparts/src/" "/home/benjaminb/kde/build/kparts/")
+include_directories("../Okular-v3d-Plugin-Code/src/Rendering" "../Okular-v3d-Plugin-Code/src/" "../Okular-v3d-Plugin-Code/src/V3dFile" "../Okular-v3d-Plugin-Code/dependencies/" "../Okular-v3d-Plugin-Code/dependencies/VulkanTools" "/usr/include/tirpc" "/home/benjaminb/kde/build/kparts/src/" "/home/benjaminb/kde/build/kparts/" "3rdParty/gzip-hpp/include")
 
 ########### next target ###############
 
@@ -22,6 +22,10 @@ set(okularGenerator_poppler_PART_SRCS
    imagescaling.cpp
    ../Okular-v3d-Plugin-Code/src/Rendering/renderheadless.cpp
    ../Okular-v3d-Plugin-Code/dependencies/VulkanTools/VulkanTools.cpp
+   ../Okular-v3d-Plugin-Code/src/V3dFile/V3dFile.cpp
+   ../Okular-v3d-Plugin-Code/src/V3dFile/V3dObject.cpp
+   ../Okular-v3d-Plugin-Code/src/V3dFile/V3dObjects.cpp
+   ../Okular-v3d-Plugin-Code/src/V3dFile/V3dUtil.cpp
 )
 
 ki18n_wrap_ui(okularGenerator_poppler_PART_SRCS
@@ -35,7 +39,7 @@ okular_add_generator(okularGenerator_poppler ${okularGenerator_poppler_PART_SRCS
 set(POPPLER_QT5_LIB /home/benjaminb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/poppler/qt5/src/libpoppler-qt5.so)
 
 #link_directories("/home/benjaminb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/poppler/qt5/src/")
-target_link_libraries(okularGenerator_poppler okularcore KF5::I18n KF5::Completion KF5::KIOWidgets Qt5::Xml ${POPPLER_QT5_LIB} vulkan)
+target_link_libraries(okularGenerator_poppler okularcore KF5::I18n KF5::Completion KF5::KIOWidgets Qt5::Xml ${POPPLER_QT5_LIB} vulkan tirpc z)
 
 message("========================= FINDING ===============================")
 
