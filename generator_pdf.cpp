@@ -812,40 +812,7 @@ Okular::Document::OpenResult PDFGenerator::loadDocumentWithPassword(const QStrin
     }
 #endif
     // create PDFDoc for the given file
-    // std::cout << "loadDocumentWithPassword" << std::endl;
     pdfdoc = Poppler::Document::load(filePath, nullptr, nullptr);
-
-    // std::cout << "Embedd file count: " << pdfdoc->embeddedFiles().size() << std::endl;
-    // std::cout << "Has embeded files: " << pdfdoc->hasEmbeddedFiles() << std::endl;
-
-    // Poppler::Page* page = pdfdoc->page(0);
-    // QList<Poppler::Annotation*> annotations = page->annotations();
-    // for (auto annot : annotations) {
-    //     // std::cout << "Name: " << annot->author().toStdString() << std::endl;
-    //     // std::cout << "  Subtype: " << annot->subType() << std::endl;
-    //     if (annot->subType() == 14) {
-    //         Poppler::RichMediaAnnotation* a = dynamic_cast<Poppler::RichMediaAnnotation*>(annot);
-
-    //         if (a) {
-    //             // std::cout << "      FOUND RICH ANNOTATION" << std::endl;
-    //             Poppler::RichMediaAnnotation::Content* content = a->content();
-    //             QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
-
-    //             for (auto asset : assets) {
-    //                 // std::cout << "      NAME: " << asset->name().toStdString() << std::endl;
-    //                 Poppler::EmbeddedFile* file = asset->embeddedFile();
-
-    //                 // std::cout << "          Embedded file info:" << std::endl;
-    //                 // std::cout << "              IsValid: " << file->isValid() << std::endl;
-    //                 // std::cout << "              size: " << file->size() << std::endl;
-    //                 // std::cout << "              name: " << file->name().toStdString() << std::endl;
-    //                 // std::cout << "              Data Size: " << file->data().size() << std::endl;
-    //             }
-    //         }
-    //     }
-    // }
-
-    //std::cout << pdfdoc->title().toStdString() << std::endl;
 
     return init(pagesVector, password);
 }
@@ -1334,6 +1301,7 @@ static bool shouldDoPartialUpdateCallback(const QVariant &vPayload)
 
 static void partialUpdateCallback(const QImage &image, const QVariant &vPayload)
 {
+    std::cout << "===================================================== Partial Update Callback ===========================" << std::endl;
     auto payload = vPayload.value<RenderImagePayload *>();
     // clang-format off
     // Otherwise the Okular::PixmapRequest* gets turned into Okular::PixmapRequest * that is not normalized and is slightly slower
@@ -1349,7 +1317,6 @@ static bool shouldAbortRenderCallback(const QVariant &vPayload)
 
 QImage PDFGenerator::image(Okular::PixmapRequest *request)
 {
-    // std::cout << "Image" << std::endl;
     // debug requests to this (xpdf) generator
     // qCDebug(OkularPdfDebug) << "id: " << request->id << " is requesting " << (request->async ? "ASYNC" : "sync") <<  " pixmap for page " << request->page->number() << " [" << request->width << " x " << request->height << "].";
 
@@ -1380,34 +1347,31 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // note: thread safety is set on 'false' for the GUI (this) thread
     Poppler::Page *p = pdfdoc->page(page->number());
 
+    bool isTile = false;
+
     // 2. Take data from outputdev and attach it to the Page
     QImage img;
     if (p) {
         if (request->isTile()) {
+            isTile = true;
             const QRect rect = request->normalizedRect().geometry(request->width(), request->height());
             if (request->partialUpdatesWanted()) {
                 RenderImagePayload payload(this, request);
-                // std::cout << "Caling renderToImage 1" << std::endl;
-                img = p->renderToImage(
-                    fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0, partialUpdateCallback, shouldDoPartialUpdateCallback, shouldAbortRenderCallback, QVariant::fromValue(&payload));
+                img = p->renderToImage(fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0, partialUpdateCallback,           shouldDoPartialUpdateCallback,  shouldAbortRenderCallback, QVariant::fromValue(&payload));
             } else {
                 RenderImagePayload payload(this, request);
-                // std::cout << "Caling renderToImage 2" << std::endl;
-                img = p->renderToImage(fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0, nullptr, nullptr, shouldAbortRenderCallback, QVariant::fromValue(&payload));
+                img = p->renderToImage(fakeDpiX, fakeDpiY, rect.x(), rect.y(), rect.width(), rect.height(), Poppler::Page::Rotate0, nullptr,                nullptr, shouldAbortRenderCallback,      QVariant::fromValue(&payload));
             }
         } else {
             if (request->partialUpdatesWanted()) {
                 RenderImagePayload payload(this, request);
-                // std::cout << "Caling renderToImage 3" << std::endl;
-                img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0, partialUpdateCallback, shouldDoPartialUpdateCallback, shouldAbortRenderCallback, QVariant::fromValue(&payload));
+                img = p->renderToImage(fakeDpiX, fakeDpiY, -1,      -1,         -1,         -1,             Poppler::Page::Rotate0, partialUpdateCallback,           shouldDoPartialUpdateCallback,  shouldAbortRenderCallback, QVariant::fromValue(&payload));
             } else {
                 RenderImagePayload payload(this, request);
-                // std::cout << "Caling renderToImage 4" << std::endl;
-                img = p->renderToImage(fakeDpiX, fakeDpiY, -1, -1, -1, -1, Poppler::Page::Rotate0, nullptr, nullptr, shouldAbortRenderCallback, QVariant::fromValue(&payload));
+                img = p->renderToImage(fakeDpiX, fakeDpiY, -1,      -1,         -1,         -1,             Poppler::Page::Rotate0, nullptr,                nullptr, shouldAbortRenderCallback,      QVariant::fromValue(&payload));
             }
         }
     } else {
-        std::cout << "MONO" << std::endl;
         img = QImage(request->width(), request->height(), QImage::Format_Mono);
         img.fill(Qt::white);
     }
@@ -1423,152 +1387,205 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     }
 
     // Custom
-    QList<Poppler::Annotation*> annotations = p->annotations();
 
-    int i = 0;
-    for (Poppler::Annotation* annotation : annotations) {
-        QRectF bound = annotation->boundary();
-        bound = bound.normalized();
+    if (!img.isNull() && img.format() != QImage::Format_Mono) {
+        QList<Poppler::Annotation*> annotations = p->annotations();
+        int i = 0;
+        for (Poppler::Annotation* annotation : annotations) {
+            QRectF bound = annotation->boundary();
+            bound = bound.normalized();
 
-        if (annotation->subType() == Poppler::Annotation::SubType::ARichMedia) {
-            Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(annotation);
-            if (richMedia == nullptr) {
-                break;
-            }
-
-            Poppler::RichMediaAnnotation::Content* content = richMedia->content();
-            if (content == nullptr) {
-                break;
-            }
-
-            QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
-
-            int j = 0;
-            for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
-                if (asset == nullptr) {
-                    break;
-                }
-                
-                Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
-                if (embeddedFile == nullptr) {
+            if (annotation->subType() == Poppler::Annotation::SubType::ARichMedia) {
+                Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(annotation);
+                if (richMedia == nullptr) {
                     break;
                 }
 
-                QByteArray fileData = embeddedFile->data();
-
-                std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
-
-                xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
-
-                V3dFile file{ xdrFile };
-
-                std::vector<float> vertices = file.vertices;
-                std::vector<unsigned int> indices = file.indices;
-
-                double pageWidth = request->width();
-                double pageHeight = request->height();
-
-                double left   = bound.left();
-                double right  = bound.right();
-                double top    = bound.top();
-                double bottom = bound.bottom();
-
-                int leftPixel   = pageWidth * left;
-                int rightPixel  = pageWidth * right;
-                int topPixel    = pageHeight * top;
-                int bottomPixel = pageHeight * bottom;
-
-                int xMin = (int)leftPixel;
-                int xMax = (int)rightPixel;
-                if (xMin > xMax) {
-                    std::swap(xMin, xMax);
+                Poppler::RichMediaAnnotation::Content* content = richMedia->content();
+                if (content == nullptr) {
+                    break;
                 }
 
-                int yMin = (int)topPixel;
-                int yMax = (int)bottomPixel;
-                if (yMin > yMax) {
-                    std::swap(yMin, yMax);
-                }
+                QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
 
-                int imageWidth = xMax - xMin;
-                int imageHeight = yMax - yMin;
-
-                // glm::mat4 model{ 1.0f };
-                // glm::mat4 view = glm::lookAt(glm::vec3{ 0.0f, 0.0f, -3.0f }, glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
-                // glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)imageWidth / (float)imageHeight, 0.01f, 100.0f);
-                // glm::mat4 mvp = projection * view * model;
-
-                glm::mat4 mat{ 1.0f };
-                mat[0][0] = 4.940727f;
-                mat[0][1] = 0.0f;
-                mat[0][2] = 0.0f;
-                mat[0][3] = 0.0f;
-
-                mat[1][0] = 0.0f;
-                mat[1][1] = 7.913279f;
-                mat[1][2] = 0.0f;
-                mat[1][3] = 0.0f;
-
-                mat[2][0] = 0.0f;
-                mat[2][1] = 0.0f;
-                mat[2][2] = -2.324568f;
-                mat[2][3] = -1.0f;
-
-                mat[3][0] = 0.0f;
-                mat[3][1] = 0.0f;
-                mat[3][2] = -2776.484131f;
-                mat[3][3] = 0.0f;
-
-                VkSubresourceLayout imageSubresourceLayout;
-                unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mat);
-
-                unsigned char* imgDatatmp = imageData;
-
-                size_t finalImageSize = imageWidth * imageHeight * 4;
-
-                std::vector<unsigned char> vectorData;
-                vectorData.reserve(finalImageSize);
-
-                int x = 0;
-                unsigned int* oldRow;
-                bool done = false;
-                for (int32_t y = 0; y < imageHeight; y++) {
-                    unsigned int *row = (unsigned int*)imgDatatmp;
-                    for (int32_t x = 0; x < imageWidth; x++) {
-                        unsigned char* charRow = (unsigned char*)row;
-                        vectorData.push_back(charRow[0]);
-                        vectorData.push_back(charRow[1]);
-                        vectorData.push_back(charRow[2]);
-                        vectorData.push_back(charRow[3]);
-
-                        row++;
+                int j = 0;
+                for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
+                    if (asset == nullptr) {
+                        break;
                     }
-                    imgDatatmp += imageSubresourceLayout.rowPitch;
-                }
-
-                int k = 0;
-                for (int y = yMax; y >= yMin; --y) {
-                    for (int x = xMin; x < xMax; ++x) {
-                        img.setPixel(x, y, QColor(
-                            vectorData[k + 0],
-                            vectorData[k + 1],
-                            vectorData[k + 2],
-                            vectorData[k + 3]
-                        ).rgb());
-                        k += 4;
+                    
+                    Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
+                    if (embeddedFile == nullptr) {
+                        break;
                     }
-                }
-                delete imageData;
-                ++j;
-            }    
+
+                    QByteArray fileData = embeddedFile->data();
+
+                    std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
+
+                    xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
+
+                    V3dFile file{ xdrFile };
+
+                    std::vector<float> vertices = file.vertices;
+                    std::vector<unsigned int> indices = file.indices;
+
+                    double left   = bound.left();
+                    double right  = bound.right();
+                    double top    = bound.top();
+                    double bottom = bound.bottom();
+
+                    int leftPixel   = request->width()  * left;
+                    int rightPixel  = request->width()  * right;
+                    int topPixel    = request->height() * top;
+                    int bottomPixel = request->height() * bottom;
+
+                    int xMin = (int)leftPixel;
+                    int xMax = (int)rightPixel;
+                    if (xMin > xMax) {
+                        std::swap(xMin, xMax);
+                    }
+
+                    int yMin = (int)topPixel;
+                    int yMax = (int)bottomPixel;
+                    if (yMin > yMax) {
+                        std::swap(yMin, yMax);
+                    }
+
+                    int imageWidth = xMax - xMin;
+                    int imageHeight = yMax - yMin;
+
+                    // glm::mat4 model{ 1.0f };
+                    // glm::mat4 view = glm::lookAt(glm::vec3{ 0.0f, 0.0f, -3.0f }, glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
+                    // glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)imageWidth / (float)imageHeight, 0.01f, 100.0f);
+                    // glm::mat4 mvp = projection * view * model;
+
+                    glm::mat4 mat{ 1.0f };
+                    mat[0][0] = 4.940727f;
+                    mat[0][1] = 0.0f;
+                    mat[0][2] = 0.0f;
+                    mat[0][3] = 0.0f;
+
+                    mat[1][0] = 0.0f;
+                    mat[1][1] = 7.913279f;
+                    mat[1][2] = 0.0f;
+                    mat[1][3] = 0.0f;
+
+                    mat[2][0] = 0.0f;
+                    mat[2][1] = 0.0f;
+                    mat[2][2] = -2.324568f;
+                    mat[2][3] = -1.0f;
+
+                    mat[3][0] = 0.0f;
+                    mat[3][1] = 0.0f;
+                    mat[3][2] = -2776.484131f;
+                    mat[3][3] = 0.0f;
+
+                    VkSubresourceLayout imageSubresourceLayout;
+                    unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mat);
+
+                    unsigned char* imgDatatmp = imageData;
+
+                    size_t finalImageSize = imageWidth * imageHeight * 4;
+
+                    std::vector<unsigned char> vectorData;
+                    vectorData.reserve(finalImageSize);
+
+                    int x = 0;
+                    unsigned int* oldRow;
+                    bool done = false;
+                    for (int32_t y = 0; y < imageHeight; y++) {
+                        unsigned int *row = (unsigned int*)imgDatatmp;
+                        for (int32_t x = 0; x < imageWidth; x++) {
+                            unsigned char* charRow = (unsigned char*)row;
+                            vectorData.push_back(charRow[0]);
+                            vectorData.push_back(charRow[1]);
+                            vectorData.push_back(charRow[2]);
+                            vectorData.push_back(charRow[3]);
+
+                            row++;
+                        }
+                        imgDatatmp += imageSubresourceLayout.rowPitch;
+                    }
+
+                    QImage image{ vectorData.data(), imageWidth, imageHeight, QImage::Format_ARGB32 };
+
+                    image = image.mirrored(false, true);
+
+                    imgDatatmp = nullptr;
+                    delete imageData;
+
+                    if (!isTile) {
+                        int k = 0;
+                        for (int y = yMax; y >= yMin; --y) {
+                            for (int x = xMin; x < xMax; ++x) {
+
+                                if (x < 0 || x >= img.width() || y < 0 || y >= img.height()) {
+                                    k += 4;
+                                    continue;
+                                }
+
+                                img.setPixel(x, y, QColor(
+                                    vectorData[k + 0],
+                                    vectorData[k + 1],
+                                    vectorData[k + 2],
+                                    vectorData[k + 3]
+                                ).rgb());
+                                k += 4;
+                            }
+                        }
+                    } else {
+                        glm::ivec2 requestSizeMin = glm::ivec2{ 0.0f, 0.0f };
+                        glm::ivec2 requestSizeMax = glm::ivec2{ request->width(), request->height() };
+
+                        glm::ivec2 imageTileSizeMin = glm::ivec2{ request->width() * request->normalizedRect().left, request->height() * request->normalizedRect().top };
+                        glm::ivec2 imageTileSizeMax = glm::ivec2{ request->width() * request->normalizedRect().right, request->height() * request->normalizedRect().bottom };
+
+                        glm::ivec2 annotationSizeMin = glm::ivec2{ request->width() * bound.left(), request->height() * bound.top() };
+                        glm::ivec2 annotationSizeMax = glm::ivec2{ request->width() * bound.right(), request->height() * bound.bottom() };
+
+                        int k = -4;
+                        for (int y = requestSizeMax.y; y >= requestSizeMin.y; --y) {
+                            for (int x = requestSizeMin.x; x < requestSizeMax.x; ++x) {
+                                bool inRequest = true;
+                                bool inTile = false;
+                                bool inAnnot = false;
+
+                                if (x >= imageTileSizeMin.x && x < imageTileSizeMax.x && y >= imageTileSizeMin.y && y < imageTileSizeMax.y) {
+                                    inTile = true;
+                                }
+
+                                if (x >= annotationSizeMin.x && x < annotationSizeMax.x && y >= annotationSizeMin.y && y < annotationSizeMax.y) {
+                                    inAnnot = true;
+                                }
+
+                                if (inAnnot) {
+                                    k += 4;
+                                }
+
+                                if (inTile && inAnnot) {
+                                    // All the min/max coords we have are in Request space, so we need to translate them into the tile space in order
+                                    // to use the correct coords
+                                    img.setPixel(x - imageTileSizeMin.x, y - imageTileSizeMin.y, QColor(
+                                        vectorData[k + 0],
+                                        vectorData[k + 1],
+                                        vectorData[k + 2],
+                                        vectorData[k + 3]
+                                    ).rgb());
+                                }
+                            }
+                        }
+                    }
+                    ++j;
+                }    
+            }
+            ++i;
         }
-        ++i;
-    }
 
-    for (auto annotation : annotations) {
-        delete annotation;
+        for (auto annotation : annotations) {
+            delete annotation;
+        }
     }
-
     // End Custom
 
     // 3. UNLOCK [re-enables shared access]
