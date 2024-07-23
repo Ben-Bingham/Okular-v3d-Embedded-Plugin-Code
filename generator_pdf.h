@@ -52,6 +52,11 @@
 #include <QPushButton>
 
 #include "../Okular-v3d-Plugin-Code/src/Rendering/renderheadless.h"
+#include "../Okular-v3d-Plugin-Code/src/V3dFile/V3dFile.h"
+#include "../Okular-v3d-Plugin-Code/src/Utility/Arcball.h"
+#include "../Okular-v3d-Plugin-Code/src/Utility/ProtectedFunctionCaller.h"
+
+#include "glm/gtx/string_cast.hpp"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
@@ -120,6 +125,62 @@ public:
     bool mouseMoveEvent(QMouseEvent* event);
     bool mouseButtonPressEvent(QMouseEvent* event);
     bool mouseButtonReleaseEvent(QMouseEvent* event);
+
+private:
+    void dragModeShift  (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
+    void dragModeZoom   (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
+    void dragModePan    (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
+    void dragModeRotate (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
+
+    void initProjection();
+    void setProjection();
+
+    void setDimensions(float width, float height, float X, float Y);
+    void updateViewMatrix();
+
+    void requestPixmapRefresh();
+    void refreshPixmap();
+
+    std::chrono::duration<double> m_MinTimeBetweenRefreshes{ 1.0 / 100.0 }; // In Seconds
+    std::chrono::time_point<std::chrono::system_clock> m_LastPixmapRefreshTime;
+
+    bool m_MouseDown{ false };
+
+    enum class DragMode {
+        SHIFT,
+        ZOOM,
+        PAN,
+        ROTATE
+    };
+    DragMode m_DragMode{ DragMode::ROTATE };
+
+    glm::ivec2 m_MousePosition;
+    glm::ivec2 m_LastMousePosition;
+
+    float m_Zoom = 1.0f;
+    float m_LastZoom{ };
+
+    float xShift;
+    float yShift;
+
+    glm::vec2 m_PageViewDimensions;
+
+    glm::mat4 m_RotationMatrix{ 1.0f };
+    glm::mat4 m_ViewMatrix{ 1.0f };
+    glm::mat4 m_ProjectionMatrix{ 1.0f };
+
+    float m_H{ };
+    glm::vec3 m_Center{ };
+    glm::vec2 m_Shift{ };
+
+    struct ViewParam {
+        glm::vec3 minValues{ };
+        glm::vec3 maxValues{ };
+    };
+
+    ViewParam m_ViewParam;
+
+    std::unique_ptr<V3dFile> m_File{ nullptr };
 
 private:
     HeadlessRenderer* m_HeadlessRenderer;

@@ -1,5 +1,5 @@
 remove_definitions(-DTRANSLATION_DOMAIN="okular")
-add_definitions(-DTRANSLATION_DOMAIN="okular_poppler")
+add_definitions(-DTRANSLATION_DOMAIN="okular_poppler" -DGLM_FORCE_RIGHT_HANDED)
 
 add_subdirectory( conf )
 
@@ -26,6 +26,8 @@ set(okularGenerator_poppler_PART_SRCS
    ../Okular-v3d-Plugin-Code/src/V3dFile/V3dObject.cpp
    ../Okular-v3d-Plugin-Code/src/V3dFile/V3dObjects.cpp
    ../Okular-v3d-Plugin-Code/src/V3dFile/V3dUtil.cpp
+   ../Okular-v3d-Plugin-Code/src/Utility/Arcball.cpp
+   ../Okular-v3d-Plugin-Code/src/Utility/ProtectedFunctionCaller.cpp
 )
 
 ki18n_wrap_ui(okularGenerator_poppler_PART_SRCS

@@ -721,18 +721,233 @@ QAbstractScrollArea* getPageViewWidget() {
 }
 
 bool PDFGenerator::mouseMoveEvent(QMouseEvent* event) {
-    // std::cout << "Mouse move event" << std::endl;
-    return false;
+    m_MousePosition.x = event->globalPos().x();
+    m_MousePosition.y = event->globalPos().y();
+
+    if (m_MouseDown == false) {
+        return true;
+    }
+
+    glm::vec2 normalizedMousePosition{ };
+    glm::vec2 lastNormalizedMousePosition{ };
+
+    glm::vec2 halfPageViewDimensions = m_PageViewDimensions / 2.0f;
+
+    normalizedMousePosition.x = (float)(m_MousePosition.x - halfPageViewDimensions.x) / halfPageViewDimensions.x;
+    normalizedMousePosition.y = (float)(m_MousePosition.y - halfPageViewDimensions.y) / halfPageViewDimensions.y;
+
+    lastNormalizedMousePosition.x = (float)(m_LastMousePosition.x - halfPageViewDimensions.x) / halfPageViewDimensions.x;
+    lastNormalizedMousePosition.y = (float)(m_LastMousePosition.y - halfPageViewDimensions.y) / halfPageViewDimensions.y;
+
+    switch (m_DragMode) {
+        case PDFGenerator::DragMode::SHIFT: {
+            dragModeShift(normalizedMousePosition, lastNormalizedMousePosition);
+            break;
+        }
+        case PDFGenerator::DragMode::ZOOM: {
+            dragModeZoom(normalizedMousePosition, lastNormalizedMousePosition);
+            break;
+        }
+        case PDFGenerator::DragMode::PAN: {
+            dragModePan(normalizedMousePosition, lastNormalizedMousePosition);
+            break;
+        }
+        case PDFGenerator::DragMode::ROTATE: {
+            dragModeRotate(normalizedMousePosition, lastNormalizedMousePosition);
+            break;
+        }
+    }
+
+    m_LastMousePosition.x = m_MousePosition.x;
+    m_LastMousePosition.y = m_MousePosition.y;
+
+    setProjection();
+    requestPixmapRefresh();
+
+    return true;
+}
+
+void PDFGenerator::initProjection() {
+    m_H = -std::tan(0.5f * m_File->headerInfo.angleOfView) * m_File->headerInfo.maxBound.z;
+
+    m_Center.x = 0.0f;
+    m_Center.y = 0.0f;
+
+    m_Center.z = 0.5f * (m_File->headerInfo.minBound.z + m_File->headerInfo.maxBound.z);
+
+    m_Zoom = m_File->headerInfo.initialZoom;
+    m_LastZoom = m_File->headerInfo.initialZoom;
+
+    m_ViewParam.minValues.z = m_File->headerInfo.minBound.z;
+    m_ViewParam.maxValues.z = m_File->headerInfo.maxBound.z;
+
+    m_Shift.x = 0.0f;
+    m_Shift.y = 0.0f;
+}
+
+void PDFGenerator::setProjection() {
+    setDimensions(m_PageViewDimensions.x, m_PageViewDimensions.y, m_Shift.x, m_Shift.y);
+
+    m_ProjectionMatrix = glm::frustumRH_ZO(m_ViewParam.minValues.x, m_ViewParam.maxValues.x, m_ViewParam.minValues.y, m_ViewParam.maxValues.y, -m_ViewParam.maxValues.z, -m_ViewParam.minValues.z);
+
+    updateViewMatrix();
+}
+
+void PDFGenerator::setDimensions(float width, float height, float X, float Y) {
+    float Aspect = width / height;
+
+    xShift = (X / width + m_File->headerInfo.viewportShift.x) * m_Zoom;
+    yShift = (Y / height + m_File->headerInfo.viewportShift.y) * m_Zoom;
+
+    float zoomInv = 1.0f / m_Zoom;
+
+    float r = m_H * zoomInv;
+    float rAspect = r * Aspect;
+
+    float X0 = 2.0f * rAspect * xShift;
+    float Y0 = 2 * r * yShift;
+
+    m_ViewParam.minValues.x = -rAspect-X0;
+    m_ViewParam.maxValues.x = rAspect-X0;
+    m_ViewParam.minValues.y = -r - Y0;
+    m_ViewParam.maxValues.y = r - Y0;
+}
+
+void PDFGenerator::updateViewMatrix() {
+    glm::mat4 temp{ 1.0f };
+    temp = glm::translate(temp, m_Center);
+    glm::mat4 cjmatInv = glm::inverse(temp);
+
+    m_ViewMatrix = m_RotationMatrix * cjmatInv;
+    m_ViewMatrix = temp * m_ViewMatrix;
+
+    m_ViewMatrix = glm::translate(m_ViewMatrix, { m_Center.x, m_Center.y, 0.0f });
+}
+
+void PDFGenerator::dragModeShift(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
+
+}
+
+void PDFGenerator::dragModeZoom(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
+    float diff = lastNormalizedMousePosition.y - normalizedMousePosition.y;
+
+    float stepPower = m_File->headerInfo.zoomStep * (m_PageViewDimensions.y / 2.0f) * diff;
+    const float limit = std::log(0.1f * std::numeric_limits<float>::max()) / std::log(m_File->headerInfo.zoomFactor);
+
+    if (std::abs(stepPower) < limit) {
+        m_Zoom *= std::pow(m_File->headerInfo.zoomFactor, stepPower);
+
+        float maxZoom = std::sqrt(std::numeric_limits<float>::max());
+        float minZoom = 1 / maxZoom;
+
+        if (m_Zoom <= minZoom) {
+            m_Zoom = minZoom;
+        } else if (m_Zoom >= maxZoom) {
+            m_Zoom = maxZoom;
+        }
+    }
+}
+
+void PDFGenerator::dragModePan(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
+
+}
+
+void PDFGenerator::dragModeRotate(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
+    float arcballFactor = 1.0f;
+
+    if (normalizedMousePosition == lastNormalizedMousePosition) { return; }
+
+    Arcball arcball{ { lastNormalizedMousePosition.x, -lastNormalizedMousePosition.y }, { normalizedMousePosition.x, -normalizedMousePosition.y} };
+    float angle = arcball.angle;
+    glm::vec3 axis = arcball.axis;
+
+    float angleRadians = 2.0f * angle / m_Zoom * arcballFactor;
+    glm::mat4 temp = glm::rotate(glm::mat4(1.0f), angleRadians, axis);
+    m_RotationMatrix = temp * m_RotationMatrix;
+}
+
+void PDFGenerator::refreshPixmap() {
+    static bool shouldZoomIn = true;
+
+    int zoom = 0;
+    if (shouldZoomIn) {
+        zoom = 1;
+        shouldZoomIn = false;
+    } else {
+        zoom = -1;
+        shouldZoomIn = true;
+    }
+
+    QWheelEvent* wheelEvent = new QWheelEvent(
+        QPointF{},            // pos
+        QPointF{},            // globalPos
+        QPoint{},             // pixelDelta
+        QPoint{ zoom, zoom }, // angleDelta
+        0,                    // buttons
+        Qt::ControlModifier,  // modifiers
+        Qt::NoScrollPhase,    // phase
+        false                 // inverted
+    );
+
+    QMouseEvent* mouseEvent = new QMouseEvent(
+        QEvent::MouseButtonRelease,     // type
+        QPointF{ },                     // localPos
+        QPointF{ },                     // globalPos
+        Qt::MiddleButton,               // button
+        0,                              // buttons
+        Qt::NoModifier                  // modifiers
+    );
+
+    ProtectedFunctionCaller::callWheelEvent(m_PageView, wheelEvent);
+    ProtectedFunctionCaller::callMouseReleaseEvent(m_PageView, mouseEvent);
+}
+
+void PDFGenerator::requestPixmapRefresh() {
+    auto elapsedTime = std::chrono::system_clock::now() - m_LastPixmapRefreshTime;
+
+    auto elapsedTimeSeconds = std::chrono::duration_cast<std::chrono::duration<double>>(elapsedTime);
+
+    if (elapsedTimeSeconds > m_MinTimeBetweenRefreshes) {
+        refreshPixmap();
+        m_LastPixmapRefreshTime = std::chrono::system_clock::now();
+    }
 }
 
 bool PDFGenerator::mouseButtonPressEvent(QMouseEvent* event) {
-    // std::cout << "Mouse button press" << std::endl;
-    return false;
+    if (m_MouseDown != false) {
+        return true;
+    }
+
+    m_LastMousePosition.x = m_MousePosition.x;
+    m_LastMousePosition.y = m_MousePosition.y;
+
+    m_MouseDown = true;
+
+    bool controlKey = event->modifiers() & Qt::ControlModifier;
+    bool shiftKey = event->modifiers() & Qt::ShiftModifier;
+    bool altKey = event->modifiers() & Qt::AltModifier;
+
+    if (controlKey && !shiftKey && !altKey) {
+        m_DragMode = PDFGenerator::DragMode::SHIFT;
+    } else if (!controlKey && shiftKey && !altKey) {
+        m_DragMode = PDFGenerator::DragMode::ZOOM;
+    } else if (!controlKey && !shiftKey && altKey) {
+        m_DragMode = PDFGenerator::DragMode::PAN;
+    } else {
+        m_DragMode = PDFGenerator::DragMode::ROTATE;
+    }
+
+    return true;
 }
 
 bool PDFGenerator::mouseButtonReleaseEvent(QMouseEvent* event) {
-    // std::cout << "Mouse button release" << std::endl;
-    return false;
+    if (m_MouseDown != true) {
+        return true;
+    }
+
+    m_MouseDown = false;
+
+    return true;
 }
 
 void PDFGenerator::CustomConstructor() {
@@ -742,6 +957,9 @@ void PDFGenerator::CustomConstructor() {
     m_PageView->viewport()->installEventFilter(m_EventFilter);
 
     m_HeadlessRenderer = new HeadlessRenderer{ "/home/benjaminb/kde/src/okular/generators/Okular-v3d-Plugin-Code/shaders/" };
+
+    m_PageViewDimensions.x = m_PageView->width();
+    m_PageViewDimensions.y = m_PageView->height();
 }
 
 void PDFGenerator::CustomDestructor() { 
@@ -1301,7 +1519,6 @@ static bool shouldDoPartialUpdateCallback(const QVariant &vPayload)
 
 static void partialUpdateCallback(const QImage &image, const QVariant &vPayload)
 {
-    std::cout << "===================================================== Partial Update Callback ===========================" << std::endl;
     auto payload = vPayload.value<RenderImagePayload *>();
     // clang-format off
     // Otherwise the Okular::PixmapRequest* gets turned into Okular::PixmapRequest * that is not normalized and is slightly slower
@@ -1425,10 +1642,14 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
 
                     xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
 
-                    V3dFile file{ xdrFile };
+                    if (m_File == nullptr) {
+                        m_File = std::make_unique<V3dFile>(xdrFile);
 
-                    std::vector<float> vertices = file.vertices;
-                    std::vector<unsigned int> indices = file.indices;
+                        initProjection();
+                    }
+
+                    std::vector<float> vertices = m_File->vertices;
+                    std::vector<unsigned int> indices = m_File->indices;
 
                     double left   = bound.left();
                     double right  = bound.right();
@@ -1455,34 +1676,14 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
                     int imageWidth = xMax - xMin;
                     int imageHeight = yMax - yMin;
 
-                    // glm::mat4 model{ 1.0f };
-                    // glm::mat4 view = glm::lookAt(glm::vec3{ 0.0f, 0.0f, -3.0f }, glm::vec3{ 0.0f, 0.0f, 0.0f }, glm::vec3{ 0.0f, 1.0f, 0.0f });
-                    // glm::mat4 projection = glm::perspective(glm::radians(60.0f), (float)imageWidth / (float)imageHeight, 0.01f, 100.0f);
-                    // glm::mat4 mvp = projection * view * model;
+                    glm::mat4 model{ 1.0f };
 
-                    glm::mat4 mat{ 1.0f };
-                    mat[0][0] = 4.940727f;
-                    mat[0][1] = 0.0f;
-                    mat[0][2] = 0.0f;
-                    mat[0][3] = 0.0f;
+                    setProjection();
 
-                    mat[1][0] = 0.0f;
-                    mat[1][1] = 7.913279f;
-                    mat[1][2] = 0.0f;
-                    mat[1][3] = 0.0f;
-
-                    mat[2][0] = 0.0f;
-                    mat[2][1] = 0.0f;
-                    mat[2][2] = -2.324568f;
-                    mat[2][3] = -1.0f;
-
-                    mat[3][0] = 0.0f;
-                    mat[3][1] = 0.0f;
-                    mat[3][2] = -2776.484131f;
-                    mat[3][3] = 0.0f;
+	                glm::mat4 mvp = m_ProjectionMatrix * m_ViewMatrix * model;
 
                     VkSubresourceLayout imageSubresourceLayout;
-                    unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mat);
+                    unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mvp);
 
                     unsigned char* imgDatatmp = imageData;
 
