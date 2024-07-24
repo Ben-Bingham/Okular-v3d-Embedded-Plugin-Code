@@ -16,8 +16,8 @@
 #include <gzip/utils.hpp>
 #include <gzip/version.hpp>
 
-#include "../Okular-v3d-Plugin-Code/dependencies/xstream.h"
-#include "../Okular-v3d-Plugin-Code/src/V3dFile/V3dFile.h"
+#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/3rdParty/xstream.h"
+#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/V3dFile/V3dFile.h"
 
 #include <iostream>
 

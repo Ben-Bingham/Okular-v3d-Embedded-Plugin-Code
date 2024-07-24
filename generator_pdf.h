@@ -51,10 +51,10 @@
 #include <QtWidgets>
 #include <QPushButton>
 
-#include "../Okular-v3d-Plugin-Code/src/Rendering/renderheadless.h"
-#include "../Okular-v3d-Plugin-Code/src/V3dFile/V3dFile.h"
-#include "../Okular-v3d-Plugin-Code/src/Utility/Arcball.h"
-#include "../Okular-v3d-Plugin-Code/src/Utility/ProtectedFunctionCaller.h"
+#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/Rendering/renderheadless.h"
+#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/V3dFile/V3dFile.h"
+#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/Utility/Arcball.h"
+#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/Utility/ProtectedFunctionCaller.h"
 
 #include "glm/gtx/string_cast.hpp"
 
