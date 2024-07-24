@@ -51,12 +51,9 @@
 #include <QtWidgets>
 #include <QPushButton>
 
-#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/Rendering/renderheadless.h"
-#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/V3dFile/V3dFile.h"
-#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/Utility/Arcball.h"
-#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/Utility/ProtectedFunctionCaller.h"
+#include <glm/gtx/string_cast.hpp>
 
-#include "glm/gtx/string_cast.hpp"
+#include "V3dModelManager.h"
 
 class PDFOptionsPage;
 class PopplerAnnotationProxy;
@@ -83,114 +80,11 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
 
 // ==================================== Custom Addition ====================================
 public:
-    class EventFilter : public QObject {
-    public:
-        EventFilter(QObject* parent, PDFGenerator* generator)
-            : QObject(parent), generator(generator) { }
-        ~EventFilter() override = default;
-
-        bool eventFilter(QObject *object, QEvent *event) {
-            if (generator == nullptr) {
-                return false;
-            }
-
-            if (event->type() == QEvent::MouseMove) {
-                QMouseEvent* mouseMove = dynamic_cast<QMouseEvent*>(event);
-
-                if (mouseMove != nullptr) {
-                    return generator->mouseMoveEvent(mouseMove);
-                }
-
-            } else if (event->type() == QEvent::MouseButtonPress) {
-                QMouseEvent* mousePress = dynamic_cast<QMouseEvent*>(event);
-
-                if (mousePress != nullptr) {
-                    return generator->mouseButtonPressEvent(mousePress);
-                }
-
-            } else if (event->type() == QEvent::MouseButtonRelease) {
-                QMouseEvent* mouseRelease = dynamic_cast<QMouseEvent*>(event);
-
-                if (mouseRelease != nullptr) {
-                    return generator->mouseButtonReleaseEvent(mouseRelease);
-                }
-            }
-
-            return false;
-        }
-
-        PDFGenerator* generator;
-    };
-
-    bool mouseMoveEvent(QMouseEvent* event);
-    bool mouseButtonPressEvent(QMouseEvent* event);
-    bool mouseButtonReleaseEvent(QMouseEvent* event);
+    V3dModelManager modelManager{ };
 
 private:
-    void dragModeShift  (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
-    void dragModeZoom   (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
-    void dragModePan    (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
-    void dragModeRotate (const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition);
-
-    void initProjection();
-    void setProjection();
-
-    void setDimensions(float width, float height, float X, float Y);
-    void updateViewMatrix();
-
-    void requestPixmapRefresh();
-    void refreshPixmap();
-
-    std::chrono::duration<double> m_MinTimeBetweenRefreshes{ 1.0 / 100.0 }; // In Seconds
-    std::chrono::time_point<std::chrono::system_clock> m_LastPixmapRefreshTime;
-
-    bool m_MouseDown{ false };
-
-    enum class DragMode {
-        SHIFT,
-        ZOOM,
-        PAN,
-        ROTATE
-    };
-    DragMode m_DragMode{ DragMode::ROTATE };
-
-    glm::ivec2 m_MousePosition;
-    glm::ivec2 m_LastMousePosition;
-
-    float m_Zoom = 1.0f;
-    float m_LastZoom{ };
-
-    float xShift;
-    float yShift;
-
-    glm::vec2 m_PageViewDimensions;
-
-    glm::mat4 m_RotationMatrix{ 1.0f };
-    glm::mat4 m_ViewMatrix{ 1.0f };
-    glm::mat4 m_ProjectionMatrix{ 1.0f };
-
-    float m_H{ };
-    glm::vec3 m_Center{ };
-    glm::vec2 m_Shift{ };
-
-    struct ViewParam {
-        glm::vec3 minValues{ };
-        glm::vec3 maxValues{ };
-    };
-
-    ViewParam m_ViewParam;
-
-    std::unique_ptr<V3dFile> m_File{ nullptr };
-
-private:
-    HeadlessRenderer* m_HeadlessRenderer;
-
     void CustomConstructor();
     void CustomDestructor();
-
-    QAbstractScrollArea* m_PageView{ nullptr };
-
-    EventFilter* m_EventFilter{ nullptr };
 
 // ================================= End of Custom Addition =================================
 

@@ -16,9 +16,6 @@
 #include <gzip/utils.hpp>
 #include <gzip/version.hpp>
 
-#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/3rdParty/xstream.h"
-#include "../Okular-v3d-Plugin-Code/3rdParty/V3D-Common/V3dFile/V3dFile.h"
-
 #include <iostream>
 
 #include <memory>
@@ -645,326 +642,9 @@ static void PDFGeneratorPopplerDebugFunction(const QString &message, const QVari
 }
 
 // ==================================== Custom Addition ====================================
+void PDFGenerator::CustomConstructor() { }
 
-QAbstractScrollArea* getPageViewWidget() {
-    QAbstractScrollArea* pageView = nullptr;
-
-    for (QWidget* widget : QApplication::allWidgets()) {
-        bool hasScrollArea = false;
-        bool parentIsWidget = false;
-        bool has8Children = false;
-        bool has1QVboxChild = false;
-        bool has5QFrameChild = false;
-
-        QAbstractScrollArea* scrollArea = dynamic_cast<QAbstractScrollArea*>(widget);
-
-        if (scrollArea != nullptr) {
-            hasScrollArea = true;
-        } else {
-            continue;
-        }
-
-        QWidget* parent = dynamic_cast<QWidget*>(widget->parent());
-
-        if (parent != nullptr) {
-            parentIsWidget = true;
-        } else {
-            continue;
-        }
-
-        if (parent->children().size() == 9) {
-            has8Children = true;
-        } else {
-            continue;
-        }
-
-        int QBoxLayoutCount = 0;
-        for (auto child : parent->children()) {
-            QBoxLayout* qBox = dynamic_cast<QBoxLayout*>(child);
-
-            if (qBox != nullptr) {
-                QBoxLayoutCount += 1;
-            }
-        }
-
-        if (QBoxLayoutCount == 1) {
-            has1QVboxChild = true;
-        } else {
-            continue;
-        }
-
-        int QFrameCount = 0;
-        for (auto child : parent->children()) {
-            QFrame* qFrame = dynamic_cast<QFrame*>(child);
-
-            if (qFrame != nullptr) {
-                QFrameCount += 1;
-            }
-        }
-
-        if (QFrameCount == 6) {
-            has5QFrameChild = true;
-        } else {
-            continue;
-        }
-
-        if (hasScrollArea && parentIsWidget && has8Children && has1QVboxChild && has5QFrameChild) {
-            if (pageView != nullptr) {
-                std::cout << "ERROR, multiple pageViews found" << std::endl;
-            }
-
-            pageView = dynamic_cast<QAbstractScrollArea*>(widget);
-        }
-    }
-
-    return pageView;
-}
-
-bool PDFGenerator::mouseMoveEvent(QMouseEvent* event) {
-    m_MousePosition.x = event->globalPos().x();
-    m_MousePosition.y = event->globalPos().y();
-
-    if (m_MouseDown == false) {
-        return true;
-    }
-
-    glm::vec2 normalizedMousePosition{ };
-    glm::vec2 lastNormalizedMousePosition{ };
-
-    glm::vec2 halfPageViewDimensions = m_PageViewDimensions / 2.0f;
-
-    normalizedMousePosition.x = (float)(m_MousePosition.x - halfPageViewDimensions.x) / halfPageViewDimensions.x;
-    normalizedMousePosition.y = (float)(m_MousePosition.y - halfPageViewDimensions.y) / halfPageViewDimensions.y;
-
-    lastNormalizedMousePosition.x = (float)(m_LastMousePosition.x - halfPageViewDimensions.x) / halfPageViewDimensions.x;
-    lastNormalizedMousePosition.y = (float)(m_LastMousePosition.y - halfPageViewDimensions.y) / halfPageViewDimensions.y;
-
-    switch (m_DragMode) {
-        case PDFGenerator::DragMode::SHIFT: {
-            dragModeShift(normalizedMousePosition, lastNormalizedMousePosition);
-            break;
-        }
-        case PDFGenerator::DragMode::ZOOM: {
-            dragModeZoom(normalizedMousePosition, lastNormalizedMousePosition);
-            break;
-        }
-        case PDFGenerator::DragMode::PAN: {
-            dragModePan(normalizedMousePosition, lastNormalizedMousePosition);
-            break;
-        }
-        case PDFGenerator::DragMode::ROTATE: {
-            dragModeRotate(normalizedMousePosition, lastNormalizedMousePosition);
-            break;
-        }
-    }
-
-    m_LastMousePosition.x = m_MousePosition.x;
-    m_LastMousePosition.y = m_MousePosition.y;
-
-    setProjection();
-    requestPixmapRefresh();
-
-    return true;
-}
-
-void PDFGenerator::initProjection() {
-    m_H = -std::tan(0.5f * m_File->headerInfo.angleOfView) * m_File->headerInfo.maxBound.z;
-
-    m_Center.x = 0.0f;
-    m_Center.y = 0.0f;
-
-    m_Center.z = 0.5f * (m_File->headerInfo.minBound.z + m_File->headerInfo.maxBound.z);
-
-    m_Zoom = m_File->headerInfo.initialZoom;
-    m_LastZoom = m_File->headerInfo.initialZoom;
-
-    m_ViewParam.minValues.z = m_File->headerInfo.minBound.z;
-    m_ViewParam.maxValues.z = m_File->headerInfo.maxBound.z;
-
-    m_Shift.x = 0.0f;
-    m_Shift.y = 0.0f;
-}
-
-void PDFGenerator::setProjection() {
-    setDimensions(m_PageViewDimensions.x, m_PageViewDimensions.y, m_Shift.x, m_Shift.y);
-
-    m_ProjectionMatrix = glm::frustumRH_ZO(m_ViewParam.minValues.x, m_ViewParam.maxValues.x, m_ViewParam.minValues.y, m_ViewParam.maxValues.y, -m_ViewParam.maxValues.z, -m_ViewParam.minValues.z);
-
-    updateViewMatrix();
-}
-
-void PDFGenerator::setDimensions(float width, float height, float X, float Y) {
-    float Aspect = width / height;
-
-    xShift = (X / width + m_File->headerInfo.viewportShift.x) * m_Zoom;
-    yShift = (Y / height + m_File->headerInfo.viewportShift.y) * m_Zoom;
-
-    float zoomInv = 1.0f / m_Zoom;
-
-    float r = m_H * zoomInv;
-    float rAspect = r * Aspect;
-
-    float X0 = 2.0f * rAspect * xShift;
-    float Y0 = 2 * r * yShift;
-
-    m_ViewParam.minValues.x = -rAspect-X0;
-    m_ViewParam.maxValues.x = rAspect-X0;
-    m_ViewParam.minValues.y = -r - Y0;
-    m_ViewParam.maxValues.y = r - Y0;
-}
-
-void PDFGenerator::updateViewMatrix() {
-    glm::mat4 temp{ 1.0f };
-    temp = glm::translate(temp, m_Center);
-    glm::mat4 cjmatInv = glm::inverse(temp);
-
-    m_ViewMatrix = m_RotationMatrix * cjmatInv;
-    m_ViewMatrix = temp * m_ViewMatrix;
-
-    m_ViewMatrix = glm::translate(m_ViewMatrix, { m_Center.x, m_Center.y, 0.0f });
-}
-
-void PDFGenerator::dragModeShift(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
-
-}
-
-void PDFGenerator::dragModeZoom(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
-    float diff = lastNormalizedMousePosition.y - normalizedMousePosition.y;
-
-    float stepPower = m_File->headerInfo.zoomStep * (m_PageViewDimensions.y / 2.0f) * diff;
-    const float limit = std::log(0.1f * std::numeric_limits<float>::max()) / std::log(m_File->headerInfo.zoomFactor);
-
-    if (std::abs(stepPower) < limit) {
-        m_Zoom *= std::pow(m_File->headerInfo.zoomFactor, stepPower);
-
-        float maxZoom = std::sqrt(std::numeric_limits<float>::max());
-        float minZoom = 1 / maxZoom;
-
-        if (m_Zoom <= minZoom) {
-            m_Zoom = minZoom;
-        } else if (m_Zoom >= maxZoom) {
-            m_Zoom = maxZoom;
-        }
-    }
-}
-
-void PDFGenerator::dragModePan(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
-
-}
-
-void PDFGenerator::dragModeRotate(const glm::vec2& normalizedMousePosition, const glm::vec2& lastNormalizedMousePosition) {
-    float arcballFactor = 1.0f;
-
-    if (normalizedMousePosition == lastNormalizedMousePosition) { return; }
-
-    Arcball arcball{ { lastNormalizedMousePosition.x, -lastNormalizedMousePosition.y }, { normalizedMousePosition.x, -normalizedMousePosition.y} };
-    float angle = arcball.angle;
-    glm::vec3 axis = arcball.axis;
-
-    float angleRadians = 2.0f * angle / m_Zoom * arcballFactor;
-    glm::mat4 temp = glm::rotate(glm::mat4(1.0f), angleRadians, axis);
-    m_RotationMatrix = temp * m_RotationMatrix;
-}
-
-void PDFGenerator::refreshPixmap() {
-    static bool shouldZoomIn = true;
-
-    int zoom = 0;
-    if (shouldZoomIn) {
-        zoom = 1;
-        shouldZoomIn = false;
-    } else {
-        zoom = -1;
-        shouldZoomIn = true;
-    }
-
-    QWheelEvent* wheelEvent = new QWheelEvent(
-        QPointF{},            // pos
-        QPointF{},            // globalPos
-        QPoint{},             // pixelDelta
-        QPoint{ zoom, zoom }, // angleDelta
-        0,                    // buttons
-        Qt::ControlModifier,  // modifiers
-        Qt::NoScrollPhase,    // phase
-        false                 // inverted
-    );
-
-    QMouseEvent* mouseEvent = new QMouseEvent(
-        QEvent::MouseButtonRelease,     // type
-        QPointF{ },                     // localPos
-        QPointF{ },                     // globalPos
-        Qt::MiddleButton,               // button
-        0,                              // buttons
-        Qt::NoModifier                  // modifiers
-    );
-
-    ProtectedFunctionCaller::callWheelEvent(m_PageView, wheelEvent);
-    ProtectedFunctionCaller::callMouseReleaseEvent(m_PageView, mouseEvent);
-}
-
-void PDFGenerator::requestPixmapRefresh() {
-    auto elapsedTime = std::chrono::system_clock::now() - m_LastPixmapRefreshTime;
-
-    auto elapsedTimeSeconds = std::chrono::duration_cast<std::chrono::duration<double>>(elapsedTime);
-
-    if (elapsedTimeSeconds > m_MinTimeBetweenRefreshes) {
-        refreshPixmap();
-        m_LastPixmapRefreshTime = std::chrono::system_clock::now();
-    }
-}
-
-bool PDFGenerator::mouseButtonPressEvent(QMouseEvent* event) {
-    if (m_MouseDown != false) {
-        return true;
-    }
-
-    m_LastMousePosition.x = m_MousePosition.x;
-    m_LastMousePosition.y = m_MousePosition.y;
-
-    m_MouseDown = true;
-
-    bool controlKey = event->modifiers() & Qt::ControlModifier;
-    bool shiftKey = event->modifiers() & Qt::ShiftModifier;
-    bool altKey = event->modifiers() & Qt::AltModifier;
-
-    if (controlKey && !shiftKey && !altKey) {
-        m_DragMode = PDFGenerator::DragMode::SHIFT;
-    } else if (!controlKey && shiftKey && !altKey) {
-        m_DragMode = PDFGenerator::DragMode::ZOOM;
-    } else if (!controlKey && !shiftKey && altKey) {
-        m_DragMode = PDFGenerator::DragMode::PAN;
-    } else {
-        m_DragMode = PDFGenerator::DragMode::ROTATE;
-    }
-
-    return true;
-}
-
-bool PDFGenerator::mouseButtonReleaseEvent(QMouseEvent* event) {
-    if (m_MouseDown != true) {
-        return true;
-    }
-
-    m_MouseDown = false;
-
-    return true;
-}
-
-void PDFGenerator::CustomConstructor() {
-    m_PageView = getPageViewWidget();
-
-    m_EventFilter = new EventFilter(m_PageView, this);
-    m_PageView->viewport()->installEventFilter(m_EventFilter);
-
-    m_HeadlessRenderer = new HeadlessRenderer{ "/home/benjaminb/kde/src/okular/generators/Okular-v3d-Plugin-Code/shaders/" };
-
-    m_PageViewDimensions.x = m_PageView->width();
-    m_PageViewDimensions.y = m_PageView->height();
-}
-
-void PDFGenerator::CustomDestructor() { 
-    delete m_HeadlessRenderer;
-}
+void PDFGenerator::CustomDestructor() { }
 
 // ================================= End of Custom Addition =================================
 
@@ -1007,9 +687,7 @@ PDFGenerator::PDFGenerator(QObject *parent, const QVariantList &args)
     }
 #endif
 
-    std::cout << "===================== Start of Constructor =====================" << std::endl;
     CustomConstructor();
-    std::cout << "====================== End of Constructor ======================" << std::endl;
 }
 
 PDFGenerator::~PDFGenerator()
@@ -1044,7 +722,6 @@ Okular::Document::OpenResult PDFGenerator::loadDocumentFromDataWithPassword(cons
     }
 #endif
     // create PDFDoc for the given file
-        std::cout << "loadDocumentFromDataWithPassword" << std::endl;
     pdfdoc = Poppler::Document::loadFromData(fileData, nullptr, nullptr);
     return init(pagesVector, password);
 }
@@ -1155,7 +832,6 @@ void PDFGenerator::loadPages(QVector<Okular::Page *> &pagesVector, int rotation,
 {
     // TODO XPDF 3.01 check
     const int count = pagesVector.count();
-    // std::cout << "Loading: " << count << " Pages" << std::endl;
     double w = 0, h = 0;
     for (int i = 0; i < count; i++) {
         // get xpdf page
@@ -1605,6 +1281,7 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
 
     // Custom
 
+    /*
     if (!img.isNull() && img.format() != QImage::Format_Mono) {
         QList<Poppler::Annotation*> annotations = p->annotations();
         int i = 0;
@@ -1787,6 +1464,7 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
             delete annotation;
         }
     }
+    */
     // End Custom
 
     // 3. UNLOCK [re-enables shared access]
@@ -2335,7 +2013,6 @@ void PDFGenerator::addSynopsisChildren(const QVector<Poppler::OutlineItem> &outl
 
 void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page)
 {
-    // std::cout << "Adding Annotations" << std::endl;
     QSet<Poppler::Annotation::SubType> subtypes;
     subtypes << Poppler::Annotation::AFileAttachment << Poppler::Annotation::ASound << Poppler::Annotation::AMovie << Poppler::Annotation::AWidget << Poppler::Annotation::AScreen << Poppler::Annotation::AText << Poppler::Annotation::ALine
              << Poppler::Annotation::AGeom << Poppler::Annotation::AHighlight << Poppler::Annotation::AInk << Poppler::Annotation::AStamp << Poppler::Annotation::ACaret;
@@ -2343,10 +2020,42 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
     const QList<Poppler::Annotation *> popplerAnnotations = popplerPage->annotations(subtypes);
 
     for (Poppler::Annotation *a : popplerAnnotations) {
-        std::cout << "New Annotation" << std::endl;
-        std::cout << "  Type: " << a->subType() << std::endl;
-        std::cout << "  Boundry height: " << a->boundary().height() << std::endl;
-        std::cout << "  Boundry width: " << a->boundary().width() << std::endl;
+        if (a->subType() == Poppler::Annotation::SubType::ARichMedia) {
+            QRectF bound = a->boundary();
+            bound = bound.normalized();
+
+            Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(a);
+            if (richMedia == nullptr) {
+                continue;
+            }
+
+            Poppler::RichMediaAnnotation::Content* content = richMedia->content();
+            if (content == nullptr) {
+                continue;
+            }
+
+            QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
+
+            for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
+                if (asset == nullptr) {
+                    continue;
+                }
+                
+                Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
+                if (embeddedFile == nullptr) {
+                    continue;
+                }
+
+                QByteArray fileData = embeddedFile->data();
+
+                std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
+
+                xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
+
+                modelManager.AddModel(V3dModel{ xdrFile }, page->number());                
+            }    
+        }
+    
         bool doDelete = true;
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a, *popplerPage, &doDelete);
         if (newann) {
