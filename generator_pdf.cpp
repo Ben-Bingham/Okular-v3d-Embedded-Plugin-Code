@@ -1280,192 +1280,32 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     }
 
     // Custom
-
-    /*
     if (!img.isNull() && img.format() != QImage::Format_Mono) {
-        QList<Poppler::Annotation*> annotations = p->annotations();
+        size_t pageNumber = (size_t)request->page()->number();
+
         int i = 0;
-        for (Poppler::Annotation* annotation : annotations) {
-            QRectF bound = annotation->boundary();
-            bound = bound.normalized();
+        for (auto& model : modelManager.Models(pageNumber)) {
+            int xMin = (int)(request->width() * model.minBound.x);
+            int xMax = (int)(request->width() * model.maxBound.x);
+            int yMin = (int)(request->height() * model.minBound.y);
+            int yMax = (int)(request->height() * model.maxBound.y);
+            
+            int imageWidth = xMax - xMin;
+            int imageHeight = yMax - yMin;
 
-            if (annotation->subType() == Poppler::Annotation::SubType::ARichMedia) {
-                Poppler::RichMediaAnnotation* richMedia = dynamic_cast<Poppler::RichMediaAnnotation*>(annotation);
-                if (richMedia == nullptr) {
-                    break;
-                }
+            QImage image = modelManager.RenderModel(pageNumber, i, imageWidth, imageHeight);
 
-                Poppler::RichMediaAnnotation::Content* content = richMedia->content();
-                if (content == nullptr) {
-                    break;
-                }
+            QPainter painter{ &img };
 
-                QList<Poppler::RichMediaAnnotation::Asset*> assets = content->assets();
-
-                int j = 0;
-                for (Poppler::RichMediaAnnotation::Asset* asset : assets) {
-                    if (asset == nullptr) {
-                        break;
-                    }
-                    
-                    Poppler::EmbeddedFile* embeddedFile = asset->embeddedFile();
-                    if (embeddedFile == nullptr) {
-                        break;
-                    }
-
-                    QByteArray fileData = embeddedFile->data();
-
-                    std::string decompressedData = gzip::decompress(fileData.data(), fileData.size());
-
-                    xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
-
-                    if (m_File == nullptr) {
-                        m_File = std::make_unique<V3dFile>(xdrFile);
-
-                        initProjection();
-                    }
-
-                    std::vector<float> vertices = m_File->vertices;
-                    std::vector<unsigned int> indices = m_File->indices;
-
-                    double left   = bound.left();
-                    double right  = bound.right();
-                    double top    = bound.top();
-                    double bottom = bound.bottom();
-
-                    int leftPixel   = request->width()  * left;
-                    int rightPixel  = request->width()  * right;
-                    int topPixel    = request->height() * top;
-                    int bottomPixel = request->height() * bottom;
-
-                    int xMin = (int)leftPixel;
-                    int xMax = (int)rightPixel;
-                    if (xMin > xMax) {
-                        std::swap(xMin, xMax);
-                    }
-
-                    int yMin = (int)topPixel;
-                    int yMax = (int)bottomPixel;
-                    if (yMin > yMax) {
-                        std::swap(yMin, yMax);
-                    }
-
-                    int imageWidth = xMax - xMin;
-                    int imageHeight = yMax - yMin;
-
-                    glm::mat4 model{ 1.0f };
-
-                    setProjection();
-
-	                glm::mat4 mvp = m_ProjectionMatrix * m_ViewMatrix * model;
-
-                    VkSubresourceLayout imageSubresourceLayout;
-                    unsigned char* imageData = m_HeadlessRenderer->render(imageWidth, imageHeight, &imageSubresourceLayout, vertices, indices, mvp);
-
-                    unsigned char* imgDatatmp = imageData;
-
-                    size_t finalImageSize = imageWidth * imageHeight * 4;
-
-                    std::vector<unsigned char> vectorData;
-                    vectorData.reserve(finalImageSize);
-
-                    int x = 0;
-                    unsigned int* oldRow;
-                    bool done = false;
-                    for (int32_t y = 0; y < imageHeight; y++) {
-                        unsigned int *row = (unsigned int*)imgDatatmp;
-                        for (int32_t x = 0; x < imageWidth; x++) {
-                            unsigned char* charRow = (unsigned char*)row;
-                            vectorData.push_back(charRow[0]);
-                            vectorData.push_back(charRow[1]);
-                            vectorData.push_back(charRow[2]);
-                            vectorData.push_back(charRow[3]);
-
-                            row++;
-                        }
-                        imgDatatmp += imageSubresourceLayout.rowPitch;
-                    }
-
-                    QImage image{ vectorData.data(), imageWidth, imageHeight, QImage::Format_ARGB32 };
-
-                    image = image.mirrored(false, true);
-
-                    imgDatatmp = nullptr;
-                    delete imageData;
-
-                    if (!isTile) {
-                        int k = 0;
-                        for (int y = yMax; y >= yMin; --y) {
-                            for (int x = xMin; x < xMax; ++x) {
-
-                                if (x < 0 || x >= img.width() || y < 0 || y >= img.height()) {
-                                    k += 4;
-                                    continue;
-                                }
-
-                                img.setPixel(x, y, QColor(
-                                    vectorData[k + 0],
-                                    vectorData[k + 1],
-                                    vectorData[k + 2],
-                                    vectorData[k + 3]
-                                ).rgb());
-                                k += 4;
-                            }
-                        }
-                    } else {
-                        glm::ivec2 requestSizeMin = glm::ivec2{ 0.0f, 0.0f };
-                        glm::ivec2 requestSizeMax = glm::ivec2{ request->width(), request->height() };
-
-                        glm::ivec2 imageTileSizeMin = glm::ivec2{ request->width() * request->normalizedRect().left, request->height() * request->normalizedRect().top };
-                        glm::ivec2 imageTileSizeMax = glm::ivec2{ request->width() * request->normalizedRect().right, request->height() * request->normalizedRect().bottom };
-
-                        glm::ivec2 annotationSizeMin = glm::ivec2{ request->width() * bound.left(), request->height() * bound.top() };
-                        glm::ivec2 annotationSizeMax = glm::ivec2{ request->width() * bound.right(), request->height() * bound.bottom() };
-
-                        int k = -4;
-                        for (int y = requestSizeMax.y; y >= requestSizeMin.y; --y) {
-                            for (int x = requestSizeMin.x; x < requestSizeMax.x; ++x) {
-                                bool inRequest = true;
-                                bool inTile = false;
-                                bool inAnnot = false;
-
-                                if (x >= imageTileSizeMin.x && x < imageTileSizeMax.x && y >= imageTileSizeMin.y && y < imageTileSizeMax.y) {
-                                    inTile = true;
-                                }
-
-                                if (x >= annotationSizeMin.x && x < annotationSizeMax.x && y >= annotationSizeMin.y && y < annotationSizeMax.y) {
-                                    inAnnot = true;
-                                }
-
-                                if (inAnnot) {
-                                    k += 4;
-                                }
-
-                                if (inTile && inAnnot) {
-                                    // All the min/max coords we have are in Request space, so we need to translate them into the tile space in order
-                                    // to use the correct coords
-                                    img.setPixel(x - imageTileSizeMin.x, y - imageTileSizeMin.y, QColor(
-                                        vectorData[k + 0],
-                                        vectorData[k + 1],
-                                        vectorData[k + 2],
-                                        vectorData[k + 3]
-                                    ).rgb());
-                                }
-                            }
-                        }
-                    }
-                    ++j;
-                }    
+            if (isTile) {
+                painter.drawImage(xMin - request->normalizedRect().left * request->width(), yMin - request->normalizedRect().top * request->height(), image);
+            } else {
+                painter.drawImage(xMin, yMin, image);
             }
+
             ++i;
         }
-
-        for (auto annotation : annotations) {
-            delete annotation;
-        }
     }
-    */
-    // End Custom
 
     // 3. UNLOCK [re-enables shared access]
     userMutex()->unlock();
@@ -2020,6 +1860,7 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
     const QList<Poppler::Annotation *> popplerAnnotations = popplerPage->annotations(subtypes);
 
     for (Poppler::Annotation *a : popplerAnnotations) {
+        // ============== Custom ==============
         if (a->subType() == Poppler::Annotation::SubType::ARichMedia) {
             QRectF bound = a->boundary();
             bound = bound.normalized();
@@ -2052,10 +1893,18 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
 
                 xdr::memixstream xdrFile{ decompressedData.data(), decompressedData.size() };
 
-                modelManager.AddModel(V3dModel{ xdrFile }, page->number());                
+                QRectF bound = a->boundary();
+                bound = bound.normalized();
+
+                glm::vec2 minBound{ bound.left(), bound.top() };
+                glm::vec2 maxBound{ bound.right(), bound.bottom() };
+
+                modelManager.AddModel(V3dModel{ xdrFile, minBound, maxBound }, page->number());         
             }    
         }
-    
+
+        // ============== End Custom ==============
+
         bool doDelete = true;
         Okular::Annotation *newann = createAnnotationFromPopplerAnnotation(a, *popplerPage, &doDelete);
         if (newann) {
