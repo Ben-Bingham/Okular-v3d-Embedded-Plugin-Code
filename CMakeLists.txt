@@ -9,9 +9,11 @@ include_directories(
    "3rdParty/V3D-Common" 
    "/usr/include/tirpc" 
    "/home/benjaminb/kde/build/kparts/src/" 
-   "/home/benjaminb/kde/build/kparts/" 
+   "/home/benjaminb/kde/build/kparts/"
+   "/home/benjaminb/kde/src/okular/core"
    "3rdParty/gzip-hpp/include" 
-   "/usr/include/poppler/qt5")
+   "/usr/include/poppler/qt5"
+)
 
 ########### next target ###############
 

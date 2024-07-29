@@ -80,7 +80,7 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
 
 // ==================================== Custom Addition ====================================
 public:
-    V3dModelManager modelManager{ };
+    V3dModelManager modelManager{ document() };
 
 private:
     void CustomConstructor();

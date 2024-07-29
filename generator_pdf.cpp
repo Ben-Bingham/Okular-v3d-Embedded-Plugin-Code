@@ -701,6 +701,9 @@ PDFGenerator::~PDFGenerator()
 // BEGIN Generator inherited functions
 Okular::Document::OpenResult PDFGenerator::loadDocumentWithPassword(const QString &filePath, QVector<Okular::Page *> &pagesVector, const QString &password)
 {
+    if (document() != nullptr) {
+        modelManager.SetDocument(document());
+    }
 #ifndef NDEBUG
     if (pdfdoc) {
         qCDebug(OkularPdfDebug) << "PDFGenerator: multiple calls to loadDocument. Check it.";
@@ -1215,6 +1218,8 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
 
     // compute dpi used to get an image with desired width and height
     Okular::Page *page = request->page();
+
+    modelManager.CacheRequestSize(page->number(), request->width(), request->height(), request->priority());
 
     double pageWidth = page->width(), pageHeight = page->height();
 
