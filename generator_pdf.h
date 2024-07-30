@@ -80,7 +80,7 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
 
 // ==================================== Custom Addition ====================================
 public:
-    V3dModelManager modelManager{ document() };
+    V3dModelManager modelManager{ document(), "kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/" };
 
 private:
     void CustomConstructor();
