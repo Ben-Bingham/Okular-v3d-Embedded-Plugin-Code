@@ -1222,6 +1222,7 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // This works even if a tile was requested, because the width and height are always for the full page,
     // and the normalized rect describes the size of the tile
     modelManager.CacheRequestSize(page->number(), request->width(), request->height(), request->priority());
+    modelManager.CachePage(page->number(), page);
 
     double pageWidth = page->width(), pageHeight = page->height();
 
