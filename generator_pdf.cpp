@@ -1219,10 +1219,7 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     // compute dpi used to get an image with desired width and height
     Okular::Page *page = request->page();
 
-    // This works even if a tile was requested, because the width and height are always for the full page,
-    // and the normalized rect describes the size of the tile
-    modelManager.CacheRequestSize(page->number(), request->width(), request->height(), request->priority());
-    modelManager.CachePage(page->number(), page);
+    modelManager.CacheRequest(request);
 
     double pageWidth = page->width(), pageHeight = page->height();
 
