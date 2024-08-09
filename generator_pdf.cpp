@@ -1285,7 +1285,7 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
     }
 
     // Custom
-    if (!img.isNull() && img.format() != QImage::Format_Mono) {
+    if (!img.isNull() && img.format() != QImage::Format_Mono && !modelManager.Empty()) {
         size_t pageNumber = (size_t)request->page()->number();
 
         int i = 0;
@@ -1907,7 +1907,6 @@ void PDFGenerator::addAnnotations(Poppler::Page *popplerPage, Okular::Page *page
                 modelManager.AddModel(V3dModel{ xdrFile, minBound, maxBound }, page->number());         
             }    
         }
-
         // ============== End Custom ==============
 
         bool doDelete = true;
