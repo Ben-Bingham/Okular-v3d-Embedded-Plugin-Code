@@ -14,9 +14,9 @@
 #include "pdfsettings.h"
 #include "pdfsignatureutils.h"
 
-#include <poppler-qt5.h>
+#include <poppler-qt6.h>
 
-extern Okular::Action *createLinkFromPopplerLink(const Poppler::Link *popplerLink, bool deletePopplerLink = true);
+extern Okular::Action *createLinkFromPopplerLink(std::variant<const Poppler::Link *, std::unique_ptr<Poppler::Link>> popplerLink);
 #define SET_ANNOT_ACTIONS                                                                                                                                                                                                                      \
     setAdditionalAction(Okular::Annotation::CursorEntering, createLinkFromPopplerLink(m_field->additionalAction(Poppler::Annotation::CursorEnteringAction)));                                                                                  \
     setAdditionalAction(Okular::Annotation::CursorLeaving, createLinkFromPopplerLink(m_field->additionalAction(Poppler::Annotation::CursorLeavingAction)));                                                                                    \
@@ -138,7 +138,7 @@ Poppler::FormFieldIcon PopplerFormFieldButton::icon() const
 void PopplerFormFieldButton::setIcon(Okular::FormField *field)
 {
     if (field->type() == Okular::FormField::FormButton) {
-        PopplerFormFieldButton *button = static_cast<PopplerFormFieldButton *>(field);
+        const PopplerFormFieldButton *button = static_cast<PopplerFormFieldButton *>(field);
         m_field->setIcon(button->icon());
     }
 }
@@ -397,11 +397,38 @@ PopplerFormFieldSignature::PopplerFormFieldSignature(std::unique_ptr<Poppler::Fo
     if (!PDFSettings::checkOCSPServers()) {
         validateOptions = validateOptions | Poppler::FormFieldSignature::ValidateWithoutOCSPRevocationCheck;
     }
+
+#if POPPLER_VERSION_MACRO > QT_VERSION_CHECK(24, 4, 0)
+    auto result = m_field->validateAsync(static_cast<Poppler::FormFieldSignature::ValidateOptions>(validateOptions));
+    m_info = fromPoppler(result.first);
+    m_asyncObject = result.second;
+    QObject::connect(m_asyncObject.get(), &Poppler::AsyncObject::done, m_asyncObject.get(), [this]() {
+        m_info.setCertificateStatus(fromPoppler(m_field->validateResult()));
+        for (const auto &[_, callback] : m_updateSubscriptions) {
+            callback();
+        }
+    });
+#else
     m_info = fromPoppler(m_field->validate(static_cast<Poppler::FormFieldSignature::ValidateOptions>(validateOptions)));
+#endif
     SET_ACTIONS
 }
 
 PopplerFormFieldSignature::~PopplerFormFieldSignature() = default;
+
+static Okular::FormFieldSignature::SubscriptionHandle globalHandle = 0;
+
+Okular::FormFieldSignature::SubscriptionHandle PopplerFormFieldSignature::subscribeUpdates(const std::function<void()> &callback) const
+{
+    auto handle = (globalHandle++);
+    m_updateSubscriptions.emplace(handle, callback);
+    return handle;
+}
+
+bool PopplerFormFieldSignature::unsubscribeUpdates(const SubscriptionHandle &handle) const
+{
+    return m_updateSubscriptions.erase(handle) == 1;
+}
 
 Okular::NormalizedRect PopplerFormFieldSignature::rect() const
 {
@@ -463,5 +490,10 @@ bool PopplerFormFieldSignature::sign(const Okular::NewSignatureData &oData, cons
 {
     Poppler::PDFConverter::NewSignatureData pData;
     PDFGenerator::okularToPoppler(oData, &pData);
+#if POPPLER_VERSION_MACRO >= QT_VERSION_CHECK(24, 03, 0)
+    // 0 means "Chose an appropriate size"
+    pData.setFontSize(0);
+    pData.setLeftFontSize(0);
+#endif
     return m_field->sign(newPath, pData) == Poppler::FormFieldSignature::SigningSuccess;
 }
