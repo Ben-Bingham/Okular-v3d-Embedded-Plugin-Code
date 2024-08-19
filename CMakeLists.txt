@@ -7,12 +7,12 @@ set(CMAKE_REQUIRED_LIBRARIES Poppler::Qt5 Qt5::Core Qt5::Gui)
 
 include_directories(
    "3rdParty/V3D-Common" 
-   "/usr/include/tirpc" 
-   "/home/benjaminb/kde/build/kparts/src/" 
-   "/home/benjaminb/kde/build/kparts/"
-   "/home/benjaminb/kde/src/okular/core"
-   "3rdParty/gzip-hpp/include" 
+   "3rdParty/gzip-hpp/include"
+
+   "../../core/" # ~/kde/src/okular/core
+
    "/usr/include/poppler/qt5"
+   "/usr/include/tirpc" 
 )
 
 ########### next target ###############
@@ -24,6 +24,7 @@ set(okularGenerator_poppler_PART_SRCS
    pdfsignatureutils.cpp
    pdfsettingswidget.cpp
    imagescaling.cpp
+
    3rdParty/V3D-Common/Rendering/renderheadless.cpp
    3rdParty/V3D-Common/3rdParty/VulkanTools/VulkanTools.cpp
    3rdParty/V3D-Common/V3dFile/V3dFile.cpp
