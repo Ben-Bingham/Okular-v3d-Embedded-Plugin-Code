@@ -1312,6 +1312,8 @@ QImage PDFGenerator::image(Okular::PixmapRequest *request)
         }
     }
 
+    modelManager.DrawMouseBoundaries(&img, request->pageNumber());
+
     // 3. UNLOCK [re-enables shared access]
     userMutex()->unlock();
 
