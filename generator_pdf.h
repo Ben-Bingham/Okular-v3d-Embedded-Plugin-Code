@@ -83,10 +83,6 @@ public:
     V3dModelManager modelManager{ document(), "/home/benjaminb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/" };
     //V3dModelManager modelManager{ document(), "" };
 
-private:
-    void CustomConstructor();
-    void CustomDestructor();
-
 // ================================= End of Custom Addition =================================
 
 public:

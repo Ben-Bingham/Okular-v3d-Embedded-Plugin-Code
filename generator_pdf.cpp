@@ -641,13 +641,6 @@ static void PDFGeneratorPopplerDebugFunction(const QString &message, const QVari
     qCDebug(OkularPdfDebug) << "[Poppler]" << message;
 }
 
-// ==================================== Custom Addition ====================================
-void PDFGenerator::CustomConstructor() { }
-
-void PDFGenerator::CustomDestructor() { }
-
-// ================================= End of Custom Addition =================================
-
 PDFGenerator::PDFGenerator(QObject *parent, const QVariantList &args)
     : Generator(parent, args)
     , pdfdoc(nullptr)
@@ -686,14 +679,10 @@ PDFGenerator::PDFGenerator(QObject *parent, const QVariantList &args)
         Poppler::setActiveCryptoSignBackend(activeBackend.value());
     }
 #endif
-
-    CustomConstructor();
 }
 
 PDFGenerator::~PDFGenerator()
 {
-    CustomDestructor();
-
     delete pdfOptionsPage;
     delete certStore;
 }
