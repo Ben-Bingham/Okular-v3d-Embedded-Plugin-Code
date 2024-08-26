@@ -137,10 +137,6 @@ Okular::SignatureInfo::CertificateStatus fromPoppler(Poppler::SignatureValidatio
         return Okular::SignatureInfo::CertificateGenericError;
     case Poppler::SignatureValidationInfo::CertificateNotVerified:
         return Okular::SignatureInfo::CertificateNotVerified;
-#if POPPLER_VERSION_MACRO > QT_VERSION_CHECK(24, 04, 0)
-    case Poppler::SignatureValidationInfo::CertificateVerificationInProgress:
-        return Okular::SignatureInfo::CertificateVerificationInProgress;
-#endif
     default:
         return Okular::SignatureInfo::CertificateStatusUnknown;
     }

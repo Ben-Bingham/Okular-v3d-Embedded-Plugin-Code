@@ -15,7 +15,6 @@
 
 Okular::SignatureInfo fromPoppler(const Poppler::SignatureValidationInfo &info);
 Okular::CertificateInfo fromPoppler(const Poppler::CertificateInfo &info);
-Okular::SignatureInfo::CertificateStatus fromPoppler(Poppler::SignatureValidationInfo::CertificateStatus status);
 
 class PopplerCertificateStore : public Okular::CertificateStore
 {

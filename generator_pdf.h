@@ -57,7 +57,8 @@ class PDFGenerator : public Okular::Generator, public Okular::ConfigInterface, p
     Q_INTERFACES(Okular::SaveInterface)
 
 public:
-    V3dModelManager modelManager{ document(), "/home/benjaminbb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/"};
+    //V3dModelManager modelManager{ document(), "/home/benjaminbb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/V3D-Common/shaders/"};
+    V3dModelManager modelManager{ document(), "./"};
 
     PDFGenerator(QObject *parent, const QVariantList &args);
     ~PDFGenerator() override;
@@ -76,7 +77,7 @@ public:
         return Pixels;
     }
     QAbstractItemModel *layersModel() const override;
-    Okular::BackendOpaqueAction::OpaqueActionResult opaqueAction(const Okular::BackendOpaqueAction *action) override;
+    void opaqueAction(const Okular::BackendOpaqueAction *action) override;
 
     // [INHERITED] document information
     bool isAllowed(Okular::Permission permission) const override;
@@ -114,15 +115,6 @@ public:
     QByteArray requestFontData(const Okular::FontInfo &font) override;
 
     static void okularToPoppler(const Okular::NewSignatureData &oData, Poppler::PDFConverter::NewSignatureData *pData);
-
-    enum DocumentAdditionalActionType {
-        CloseDocument,
-        SaveDocumentStart,
-        SaveDocumentFinish,
-        PrintDocumentStart,
-        PrintDocumentFinish,
-    };
-    Okular::Action *additionalDocumentAction(Okular::Document::DocumentAdditionalActionType type) override;
 
 protected:
     SwapBackingFileResult swapBackingFile(QString const &newFileName, QVector<Okular::Page *> &newPagesVector) override;
@@ -171,8 +163,6 @@ private:
     QPointer<PDFOptionsPage> pdfOptionsPage;
 
     bool documentHasPassword = false;
-    QHash<int, Okular::Action *> m_additionalDocumentActions;
-    void setAdditionalDocumentAction(Okular::Document::DocumentAdditionalActionType type, Okular::Action *action);
 };
 
 #endif

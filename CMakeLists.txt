@@ -7,6 +7,7 @@ set(CMAKE_REQUIRED_LIBRARIES Poppler::Qt6 Qt6::Core Qt6::Gui)
 
 include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}/../..
+
    "3rdParty/V3D-Common" 
    "/usr/include/tirpc" 
    "/home/benjaminbb/kde/build/kparts/src/" 
@@ -25,6 +26,7 @@ set(okularGenerator_poppler_PART_SRCS
    pdfsignatureutils.cpp
    pdfsettingswidget.cpp
    imagescaling.cpp
+
    3rdParty/V3D-Common/V3dModel.cpp
    3rdParty/V3D-Common/V3dModelManager.cpp
    3rdParty/V3D-Common/V3dFile/V3dFile.cpp
