@@ -46,8 +46,6 @@ kconfig_add_kcfg_files(okularGenerator_poppler_PART_SRCS GENERATE_MOC conf/pdfse
 
 okular_add_generator(okularGenerator_poppler ${okularGenerator_poppler_PART_SRCS})
 
-set(POPPLER_QT5_LIB /home/benjaminb/kde/src/okular/generators/Okular-v3d-Embeded-Plugin-Code/3rdParty/poppler/qt5/src/libpoppler-qt5.so)
-
 target_link_libraries(okularGenerator_poppler okularcore KF5::I18n KF5::Completion KF5::KIOWidgets Qt5::Xml vulkan tirpc z Poppler::Qt5)
 
 find_library(NAMES poppler-qt5)
